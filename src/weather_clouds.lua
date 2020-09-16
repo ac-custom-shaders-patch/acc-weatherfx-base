@@ -108,6 +108,7 @@ function CloudTypes.Dynamic(cloud, pos)
   if math.random() > 0.8 then 
     cloud.procMap = vec2(0.5, 0.75) + math.random() * 0.15
     cloud.procSharpnessMult = 0.8
+    cloud.extraFidelity = cloud.procSharpnessMult * 1.4
     cloudutils.setProcNormalShare(cloud, 0.6, 1.8)
     cloudutils.setPos(cloud, { 
       pos = pos, 
@@ -117,6 +118,7 @@ function CloudTypes.Dynamic(cloud, pos)
   else
     cloud.procMap = vec2(0.7, 0.88) + math.random() * 0.08
     cloud.procSharpnessMult = 0.8 * math.random() ^ 2
+    cloud.extraFidelity = cloud.procSharpnessMult
     cloudutils.setProcNormalShare(cloud, 0.6, 1.8)
     cloudutils.setPos(cloud, { 
       pos = pos, 
@@ -133,6 +135,7 @@ function CloudTypes.Bottom(cloud, mainCloud)
   cloud.procScale:set(1, 1)
   cloud.procMap = mainCloud.procMap * vec2(0.8, 1)
   cloud.procSharpnessMult = mainCloud.procSharpnessMult
+  cloud.extraFidelity = mainCloud.extraFidelity
   local size = (mainCloud.size.x + mainCloud.size.y) / 2
   cloud.size:set(size, size)
   cloudutils.setProcNormalShare(cloud, 0.6, 1.8)
@@ -142,6 +145,7 @@ function CloudTypes.Hovering(cloud, pos)
   cloudutils.setTexture(cloud, CloudTextures.Hovering)
   cloud.procMap = vec2(0.7, 0.9) + math.random() * 0.15
   cloud.procSharpnessMult = math.random() ^ 2
+  cloud.extraFidelity = cloud.procSharpnessMult
   cloudutils.setProcNormalShare(cloud, 0.75)
   cloudutils.setPos(cloud, { 
     pos = pos, 
@@ -156,6 +160,7 @@ function CloudTypes.Spread(cloud, pos)
   cloudutils.setTexture(cloud, CloudTextures.Spread)
   cloud.procMap = vec2(0.7, 0.9) + math.random() * 0.15
   cloud.procSharpnessMult = math.random() ^ 2
+  cloud.extraFidelity = 1
   cloudutils.setProcNormalShare(cloud, 0.75)
 
   local isSpread = math.random() > 0.5
@@ -178,6 +183,7 @@ function CloudTypes.Low(cloud, pos, distance)
   cloud.occludeGodrays = true
   cloud.procMap = vec2(0.35, 0.75)
   cloud.procSharpnessMult = 0.8
+  cloud.extraFidelity = 1.2
   cloud.color = rgb(1, 1, 1) * (1 - distance * 0.3)
   cloud.opacity = 0.6 * (1 - distance * 0.8)
   cloud.orderBy = 1e12 + distance * 1e10

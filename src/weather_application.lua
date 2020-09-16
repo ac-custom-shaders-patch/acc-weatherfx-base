@@ -27,21 +27,27 @@ local skySunColor = rgb(1, 1, 1)
 local lightDir = vec3(0, 1, 0)
 local lightColor = rgb(0, 0, 0)
 
--- Sky gradient covering everything, for sky-wide color correction
-local skyGeneralMult = ac.SkyExtraGradient()
-skyGeneralMult.isAdditive = false
-skyGeneralMult.sizeFull = 2
-skyGeneralMult.sizeStart = 2
-skyGeneralMult.direction = vec3(0, 1, 0)
-ac.addSkyExtraGradient(skyGeneralMult)
+local skyGeneralMult = nil
+local skyGradient = nil
 
--- Sky gradient facing up, for extra juicy sky color
-local skyGradient = ac.SkyExtraGradient()
-skyGradient.isAdditive = false
-skyGradient.sizeFull = 0.5
-skyGradient.sizeStart = 1.5
-skyGradient.direction = vec3(0, 1, 0)
-ac.addSkyExtraGradient(skyGradient)
+if UseSkyV2 then
+else
+  -- Sky gradient covering everything, for sky-wide color correction
+  skyGeneralMult = ac.SkyExtraGradient()
+  skyGeneralMult.isAdditive = false
+  skyGeneralMult.sizeFull = 2
+  skyGeneralMult.sizeStart = 2
+  skyGeneralMult.direction = vec3(0, 1, 0)
+  ac.addSkyExtraGradient(skyGeneralMult)
+
+  -- Sky gradient facing up, for extra juicy sky color
+  skyGradient = ac.SkyExtraGradient()
+  skyGradient.isAdditive = false
+  skyGradient.sizeFull = 0.5
+  skyGradient.sizeStart = 1.5
+  skyGradient.direction = vec3(0, 1, 0)
+  ac.addSkyExtraGradient(skyGradient)
+end
 
 -- Custom post-processing brightness adjustment
 local ppBrightnessCorrection = ac.ColorCorrectionBrightness()
@@ -63,7 +69,8 @@ function applySky()
 
   zenithK = math.lerpInvSat(sunDir.y, 0, 0.4)
   nightK = math.lerpInvSat(sunDir.y, 0.115, -0.115)
-  deepNightK = math.lerpInvSat(sunDir.y, -0.115, -0.23)
+  deepNightK = math.lerpInvSat(sunDir.y, -0.115, -0.4)
+  deepNightK = 1 - math.pow(1 - deepNightK, 2)
 
   -- Eclipse coefficients. You can test full eclipse with Brasov track on 08/11/1999:
   -- https://www.racedepartment.com/downloads/brasov-romania.28239/
@@ -77,30 +84,73 @@ function applySky()
   local twilightK = math.lerpInvSat(sunDir.y, 0.0, -0.115)
     * math.lerpInvSat(sunDir.y, -0.23, -0.115)
 
-  local saturation = CurrentConditions.clear
-  local ccClear = CurrentConditions.clear ^ 2
-  local brightness = math.max(0.001, (1 - deepNightK) * math.lerp(1, 0.5, twilightK))
-  local skyColorR = math.lerp(0.4, 0.2, saturation * sunsetK * (1 - deepNightK))
-  local skyColorG = math.lerp(0.6, 0.9, CurrentConditions.cold ^ 2)
-  local skyColor = rgb(skyColorR, skyColorG, 1.0)
+  ac.setSkyUseV2(UseSkyV2)
+  if UseSkyV2 then    
+    -- Generally the same:
+    ac.setSkyV2MieKCoefficient(ac.SkyRegion.All, vec3(0.686, 0.678, 0.666))
+    ac.setSkyV2NumMolecules(ac.SkyRegion.All, 2.542e25)
+    ac.setSkyV2MieCoefficient(ac.SkyRegion.All, 0.005)
 
-  skyGeneralMult.color:set(brightness)
-    :scale(1 - eclipseFullK * 0.9)
-  skyGradient.color:setLerp(rgb(1, 1, 1), skyColor, zenithK * saturation * 0.8)
-    :adjustSaturation(CurrentConditions.saturation)
-    :scale((1 - eclipseFullK * 0.7) * (1 - eclipseK * 0.5))
+    -- Varying with presets:
+    -- local purpleAdjustment = CurrentConditions.cold
+    local purpleAdjustment = sunsetK
+    ac.setSkyV2Primaries(ac.SkyRegion.All, vec3(math.lerp(6.8e-7, 7.5e-7, purpleAdjustment), 5.5e-7, math.lerp(4.5e-7, 5.1e-7, purpleAdjustment)))
+    ac.setSkyV2Turbidity(ac.SkyRegion.All, 4.7)
+    ac.setSkyV2Rayleigh(ac.SkyRegion.All, 2.28)
+    ac.setSkyV2MieDirectionalG(ac.SkyRegion.All, 0.82)
+    ac.setSkyV2RefractiveIndex(ac.SkyRegion.All, 1.00029)
+    ac.setSkyV2DepolarizationFactor(ac.SkyRegion.All, 0.02)
+    ac.setSkyV2MieV(ac.SkyRegion.All, 3.936)
+    ac.setSkyV2RayleighZenithLength(ac.SkyRegion.All, 8400)
+    ac.setSkyV2MieZenithLength(ac.SkyRegion.All, 34000)
+    ac.setSkyV2SunIntensityFactor(ac.SkyRegion.All, 1000.0)
+    ac.setSkyV2SunIntensityFalloffSteepness(ac.SkyRegion.All, 1.5)
 
-  local sunMieIntensity = SunMieIntensity * (2 - ccClear) / 2 * (1 - eclipseK * 0.8) * (1 - eclipseFullK * 0.99)
-  ac.setSkyColor(skyColor)
-  ac.setSkyAnisotropicIntensity(0)
-  ac.setSkyMultiScatterPhase(math.lerp(1, 0.3 + twilightK * 0.4, ccClear ^ 0.5))
-  ac.setSkyZenithOffset(0.0 * (1 - zenithK))
-  ac.setSkyInputYOffset(0.05)
-  ac.setSkyDensity(1)
-  ac.setSkyBrightnessMult(math.lerp(0.5, 1.5, dayK))
-  ac.setSkySunBaseColor(math.pow(1 - deepNightK, 2) * sunMieIntensity * ccClear * SunColor)
-  ac.setSkySunBrightness(SunShapeIntensity * SunIntensity * (1 - eclipseK * 0.95) * (1 - eclipseFullK * 0.99) / sunMieIntensity)
-  ac.setSkySunMieExp(10)
+    -- Brightness adjustments:
+    local ccClear = CurrentConditions.clear
+    local ccClearSqr = CurrentConditions.clear ^ 2
+    ac.setSkyV2BackgroundLight(ac.SkyRegion.All, 0.0)
+    ac.setSkyV2Luminance(ac.SkyRegion.All, math.lerp(0.25, 0, deepNightK))
+    ac.setSkyV2Gamma(ac.SkyRegion.All, 2.2)
+    ac.setSkyV2SunShapeMult(ac.SkyRegion.All, 10 * ccClearSqr)
+    ac.setSkyV2Saturation(ac.SkyRegion.All, 1.2 * ccClear)
+
+    ac.setSkyBrightnessMult(math.lerp(0.7, 1, ccClear))
+
+    ac.setSkyV2YOffset(ac.SkyRegion.All, 0.05)
+    ac.setSkyV2YScale(ac.SkyRegion.All, 0.95)
+
+    local rainbowIntensity = math.lerpInvSat(sunDir.y, 0.05, 0.15)
+    ac.setSkyV2Rainbow(rainbowIntensity)
+    ac.setSkyV2RainbowSecondary(0.2)
+    ac.setSkyV2RainbowDarkening(math.lerp(1, 0.8, rainbowIntensity))
+  else
+    local saturation = CurrentConditions.clear
+    local ccClear = CurrentConditions.clear ^ 2
+    local brightness = math.max(0.001, (1 - deepNightK) * math.lerp(1, 0.5, twilightK))
+    local skyColorR = math.lerp(0.4, 0.2, saturation * sunsetK * (1 - deepNightK))
+    local skyColorG = math.lerp(0.6, 0.9, horizonK * CurrentConditions.cold ^ 2)
+    local saturationBoost = math.lerp(1, 1 / SkySaturationBoost, saturation)
+    local skyColor = rgb(skyColorR * saturationBoost, skyColorG * math.lerp(saturationBoost, 1, 0.25), 1.0)
+
+    skyGeneralMult.color:set(brightness)
+      :scale(1 - eclipseFullK * 0.9)
+    skyGradient.color:setLerp(rgb(1, 1, 1), skyColor, zenithK * saturation * 0.8)
+      :adjustSaturation(CurrentConditions.saturation)
+      :scale((1 - eclipseFullK * 0.7) * (1 - eclipseK * 0.5))
+
+    local sunMieIntensity = SunMieIntensity * (2 - ccClear) / 2 * (1 - eclipseK * 0.8) * (1 - eclipseFullK * 0.99)
+    ac.setSkyColor(skyColor)
+    ac.setSkyAnisotropicIntensity(0)
+    ac.setSkyMultiScatterPhase(math.lerp(1, 0.3 + twilightK * 0.4, ccClear ^ 0.5))
+    ac.setSkyZenithOffset(0.0 * (1 - zenithK))
+    ac.setSkyInputYOffset(0.05)
+    ac.setSkyDensity(1)
+    ac.setSkyBrightnessMult(math.lerp(0.5, 1.5, dayK))
+    ac.setSkySunBaseColor(math.pow(1 - deepNightK, 2) * sunMieIntensity * ccClear * SunColor)
+    ac.setSkySunBrightness(SunShapeIntensity * SunIntensity * (1 - eclipseK * 0.95) * (1 - eclipseFullK * 0.99) / sunMieIntensity)
+    ac.setSkySunMieExp(10)
+  end
 
   -- Getting a few colors from sky
   ac.calculateSkyColorTo(skyTopColor, vec3Up, false, false)
@@ -118,7 +168,9 @@ function applyLight()
   sunColor.r = sunColor.r * math.lerp(1, 1.6, CurrentConditions.cold * horizonK)
 
   -- Initially, it starts as a sun light
-  lightColor:set(sunColor):scale(math.lerpInvSat(sunDir.y, -0.01, 0.04))
+  lightColor:set(sunColor)
+    :scale(math.lerpInvSat(sunDir.y, -0.01, 0.04))
+    :adjustSaturation(math.lerp(1, 0.4, CurrentConditions.cold * (1 - horizonK)))
 
   -- If it’s deep night and moon is high enough, change it to moon light
   ac.getSkyAbsorptionTo(moonAbsorption, moonDir)
@@ -137,8 +189,8 @@ function applyLight()
 
   -- Adjust light color
   lightColor:scale(CurrentConditions.clear)
-  lightColor:mul(CurrentConditions.lightTint)
-  lightColor:adjustSaturation(CurrentConditions.saturation)
+    :mul(CurrentConditions.lightTint)
+    :adjustSaturation(CurrentConditions.saturation)
 
   -- Clouds have their own lighting, so sun would work even if it’s below the horizon
   local cloudSunLight = math.lerpInvSat(sunDir.y, -0.23, -0.115)
@@ -150,8 +202,16 @@ function applyLight()
   ac.setCloudsLight(lightDir, cloudLightColor, 6371e3 / 20)
 
   -- And godrays!
-  ac.setGodraysCustomColor(lightColor * SunRaysIntensity)
-  ac.setGodraysCustomDirection(lightDir)
+  if SunRaysCustom then
+    ac.setGodraysCustomColor(lightColor)
+    ac.setGodraysCustomDirection(lightDir)
+    ac.setGodraysLength(0.3)
+    ac.setGodraysGlareRatio(0)
+    ac.setGodraysAngleAttenuation(1)
+  else
+    ac.setGodraysCustomColor(lightColor * SunRaysIntensity)
+    ac.setGodraysCustomDirection(lightDir)
+  end
 
   -- Dim light if light source is very low
   lightColor:scale(math.lerpInvSat(lightDir.y, 0.03, 0.06))
@@ -165,7 +225,7 @@ function applyLight()
   if sunsetLight > 0 then
     lightDir:set(vec3(sunDir.x, 0.2, sunDir.z)):normalize()
   end
-  local extraSkyLightColor = skySunColor + sunColor * 0.05
+  local extraSkyLightColor = (skySunColor + sunColor * 0.05):scale(CurrentConditions.clear)
   lightColor:add(extraSkyLightColor * sunsetLight)
 
   -- Set extra directional ambient to point to area of the sky with the sun, but dim it down
@@ -181,6 +241,15 @@ function applyLight()
   else
     ac.setSpecularColor(lightColor)
   end
+
+  local heatFactor = math.lerpInvSat(lightDir.y, 0.7, 0.8) 
+    * math.lerpInvSat(CurrentConditions.clear, 0.8, 1) 
+    * math.lerpInvSat(CurrentConditions.clouds, 0.5, 0.2)
+    * math.lerpInvSat(CurrentConditions.windSpeed, 7, 3)
+  ac.setTrackHeatFactor(heatFactor)
+  -- ac.debug('heatFactor', heatFactor)
+  -- ac.debug('windSpeed', CurrentConditions.windSpeed)
+  -- ac.debug('windDir', CurrentConditions.windDir)
 end
 
 -- Updates ambient lighting based on sky color without taking sun or moon into account
@@ -205,7 +274,7 @@ function applyAmbient()
 
   -- Adjusting fake shadows under cars
   ac.setWeatherFakeShadowOpacity(1)
-  ac.setWeatherFakeShadowConcentrarion(math.max(deepNightK, 0.3 * zenithK * CurrentConditions.clear))
+  ac.setWeatherFakeShadowConcentrarion(math.lerp(0.3, 1, math.max(deepNightK, 0.3 * zenithK * CurrentConditions.clear)))
 end
 
 -- For smooth transition
@@ -295,7 +364,7 @@ function applyFog()
   ac.setFogDensity(math.lerp(0.15 * (1 - deepNightK), 1, ccFog))
   ac.setFogColor(fogColor)
   ac.setFogBlend(1)
-  ac.setFogDistance(math.lerp(5000, 200, fogSqrt))
+  ac.setFogDistance(math.lerp(5000, 150, fogSqrt))
   ac.setSkyFogMultiplier(fogSqrt)
   ac.setHorizonFogMultiplier(
     math.lerp(0.5, 1, fog2), 
@@ -317,7 +386,7 @@ function applySkyFeatures()
 
   ac.setSkyStarsColor(MoonColor)
   ac.setSkyStarsBrightness(mult)
-  ac.setSkyStarsSaturation(0.4 * CurrentConditions.saturation)
+  ac.setSkyStarsSaturation(0.2 * CurrentConditions.saturation)
   ac.setSkyStarsExponent(3 + lightBrightness + 10 * LightPollutionValue) -- easiest way to take light pollution into account is
     -- to raise stars map in power: with stars map storing values from 0 to 1, it gets rid of dimmer stars only leaving
     -- brightest ones
@@ -397,7 +466,7 @@ function updateCloudMaterials()
   local deepNightAdjK = math.lerpInvSat(deepNightK, 0.5, 0.9)
   main.ambientColor:set(skySunColor):scale(math.lerp(0, 0.2, sunsetK))
     :add(lightColor:clone():scale(0.1 * zenithK * math.lerp(0.4, 0.2, sunsetK)))
-    :add(skyTopColor * math.lerp(1, 0.6, deepNightK))
+    :add(skyTopColor:clone():adjustSaturation(0.5) * math.lerp(UseSkyV2 and 4 or 2, 0.6, deepNightK))
     :add(LightPollutionExtraAmbient)
   main.ambientConcentration = math.lerp(0.3, 0, deepNightK)
   main.extraDownlit

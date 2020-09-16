@@ -25,7 +25,7 @@ local windSpeed = 0
 
 -- Updates wind, randomizing it a bit
 local function updateWind(conditions, dt)
-  conditions.wind.direction = 0
+  -- conditions.wind.direction = 0
   CurrentConditions.windDir:set(
     math.sin(-conditions.wind.direction * math.pi / 180), 
     math.cos(conditions.wind.direction * math.pi / 180))
@@ -42,10 +42,12 @@ local function fillValues(v, T)
   v[T.FewClouds] =       { fog = 0.0, clear = 1.0, clouds = 0.1, fogTint = rgb(0.4, 0.6, 1) }
   v[T.ScatteredClouds] = { fog = 0.0, clear = 1.0, clouds = 0.4, fogTint = rgb(0.4, 0.6, 1) }
   v[T.BrokenClouds] =    { fog = 0.0, clear = 0.9, clouds = 0.8, fogTint = rgb(0.4, 0.6, 1) }
-  v[T.OvercastClouds] =  { fog = 0.1, clear = 0.0, clouds = 0.9, cloudsOpacity = 0.1, fogTint = rgb(1, 1, 1) }
+  -- v[T.OvercastClouds] =  { fog = 0.1, clear = 0.0, clouds = 0.9, cloudsOpacity = 0.1, fogTint = rgb(1, 1, 1) }
+  v[T.OvercastClouds] =  { fog = 0.1, clear = 0.0, clouds = 0.9, cloudsOpacity = 0.5, fogTint = rgb(1, 1, 1) }
   -- v[T.OvercastClouds] =  { fog = 0.1, clear = 0.0, clouds = 0, fogTint = rgb(1, 1, 1) }
   v[T.Windy] =           { fog = 0.0, clear = 0.8, clouds = 0.4, lightTint = rgb(0.6, 0.8, 1), fogTint = rgb(1, 1, 1) }
   v[T.Fog] =             { fog = 1.0, clear = 0.0, clouds = 0.0, fogTint = rgb(0.8, 0.9, 1) }
+  -- v[T.Fog] =             { fog = 1.0, clear = 0.0, clouds = 0.0, fogTint = rgb(1.4, 1.4, 1.4) }
   v[T.Mist] =            { fog = 0.3, clear = 0.6, clouds = 0.2, fogTint = rgb(0.8, 0.9, 1) }
   v[T.Haze] =            { fog = 0.2, clear = 0.5, clouds = 0.2, lightTint = rgb(1, 0.9, 0.8), fogTint = rgb(1, 0.6, 0.4) }
   v[T.Dust] =            { fog = 0.3, clear = 0.9, clouds = 0.4, lightTint = rgb(0.8, 0.8, 1), fogTint = rgb(1, 0.8, 0.8) }
@@ -54,9 +56,9 @@ local function fillValues(v, T)
   v[T.LightDrizzle] =    { fog = 0.1, clear = 0.3, clouds = 0.6, fogTint = rgb(0.9, 0.95, 1), wet = 0.2 }
   v[T.Drizzle] =         { fog = 0.3, clear = 0.16, clouds = 0.8, fogTint = rgb(0.9, 0.95, 1), wet = 0.3 }
   v[T.HeavyDrizzle] =    { fog = 0.5, clear = 0.02, clouds = 1.0, fogTint = rgb(0.9, 0.95, 1), wet = 0.4 }
-  v[T.LightRain] =       { fog = 0.2, clear = 0.0, clouds = 0.6, fogTint = rgb(0.7, 0.9, 1), wet = 0.6 }
-  v[T.Rain] =            { fog = 0.4, clear = 0.0, clouds = 0.8, fogTint = rgb(0.7, 0.9, 1), wet = 0.8 }
-  v[T.HeavyRain] =       { fog = 0.6, clear = 0.0, clouds = 1.0, lightTint = rgb(0.5, 0.5, 0.5), fogTint = rgb(0.7, 0.7, 0.8), wet = 1.0 }
+  v[T.LightRain] =       { fog = 0.2, clear = 0.0, clouds = 0.6, fogTint = rgb(0.9, 0.9, 0.9), wet = 0.6 }
+  v[T.Rain] =            { fog = 0.4, clear = 0.0, clouds = 0.8, fogTint = rgb(0.7, 0.7, 0.7), wet = 0.8 }
+  v[T.HeavyRain] =       { fog = 0.9, clear = 0.0, clouds = 1.0, lightTint = rgb(0.5, 0.5, 0.5), fogTint = rgb(0.7, 0.8, 0.9) / 0.8, wet = 1.0 }
   v[T.LightThunderstorm] = { fog = 0.6, clear = 0.0, clouds = 1.0, lightTint = rgb(0.3, 0.3, 0.3), fogTint = rgb(0.5, 0.5, 0.6), wet = 0.8 }
   v[T.Thunderstorm] =    { fog = 0.8, clear = 0.0, clouds = 1.0, lightTint = rgb(0.1, 0.1, 0.1), fogTint = rgb(0.4, 0.4, 0.5), wet = 0.9 }
   v[T.HeavyThunderstorm] = { fog = 1.0, clear = 0.0, clouds = 1.0, lightTint = rgb(0, 0, 0), fogTint = rgb(0.2, 0.2, 0.3), wet = 1.0 }
@@ -91,7 +93,7 @@ fillValues(values, ac.WeatherType)
 -- Stuff for smooth transition
 local lastTransition = 0
 local counter = 0
-local target = {}
+local target = { cold = 0 }
 
 local function applyTarget(lagMult, key)
   local ov = CurrentConditions[key]
@@ -131,13 +133,16 @@ end
 -- Read conditions and keep them here
 local conditionsMem = ac.getConditionsSet()
 
+-- WIP, wetness
+local wetness = 0
+
 function readConditions(dt)
   -- Update existing conditions instead of re-reading them to make garbage collector’s life easier
   local conditions = conditionsMem
   ac.getConditionsSetTo(conditions)
   updateWind(conditions, dt)  
 
-  local lagMult = math.lagMult((not SmoothTransition or counter < 10) and 0 or 0.98, dt)
+  local lagMult = math.lagMult((not SmoothTransition or counter < 10) and 0 or 0.99, dt)
   lerpConditions(conditions, lagMult, 'fog')
   lerpConditions(conditions, lagMult, 'clear')
   lerpConditions(conditions, lagMult, 'clouds')
@@ -154,5 +159,14 @@ function readConditions(dt)
 
   applyTarget(lagMult, 'cold')
   ac.setTrackCondition('wfx_WET', CurrentConditions.wet)
+  ac.setRainAmount(CurrentConditions.wet)
+  wetness = math.applyLag(wetness, CurrentConditions.wet > 0.1 and 1 or 0, 0.997, dt)  -- TODO: link to 
+  -- ac.setRainWetness(wetness)
+  -- ac.setRainWetness(0.35)
+  -- ac.setRainWetness(1)
+  -- ac.setRainWetness(0)
+  -- ac.debug('rain', CurrentConditions.wet)
+  -- ac.debug('wetness', wetness)
+
   counter = counter + 1
 end
