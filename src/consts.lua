@@ -9,18 +9,16 @@ FilterBrightnessMultPP = 1.5 -- with post-processing active: brightness adjustme
 TimelapsyCloudSpeed = true -- change to false to stop clouds from moving all fast if time goes faster
 SmoothTransition = true -- smooth transition between weather types (even if change was sudden)
 
-UseSkyV2 = true
-SunIntensity = 20 -- how bright sun is in general
+SunIntensity = 30 -- how bright sun is in general
 SunShapeIntensity = 100 -- brightness of sun circle, higher than usual for that massive post-processing glare
 SunMieIntensity = 3 -- brightness of glow around sun on the sky 
 AdaptationSpeed = 10
 SunRaysIntensity = 0.02 -- some good PP-filters expode with sun rays at full strength for some reason
 SunRaysCustom = true -- use fully custom sun ray parameters instead of SunRaysIntensity
-SunColor = rgb(1, 0.912, 0.696)
-SkySaturationBoost = 2
+SunColor = rgb(1, 0.95, 0.9)
 MoonColor = rgb(0.6, 0.8, 1):scale(2)
 MoonLightMult = 0.5 -- how bright is moon light
-LightPollutionBrightness = 0.05
+LightPollutionBrightness = 0.15
 
 CloudUseAtlas = true
 CloudSpawnScale = 0.8

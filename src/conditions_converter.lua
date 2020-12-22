@@ -8,7 +8,7 @@ CurrentConditions = {
   clear = 1, -- how clear is the sky, turns to grey with 0
   clouds = 0, -- how many shapy clouds are up there
   cloudsOpacity = 1, -- how visible are clouds
-  lightTint = rgb(1, 1, 1), -- color tint for light
+  tint = rgb(1, 1, 1), -- color tint for light
   fogTint = rgb(0.4, 0.6, 1), -- color tint for fog
   saturation = 1, -- how saturated are the colors
   wet = 0, -- wet input for track configs
@@ -16,7 +16,8 @@ CurrentConditions = {
     -- weather type is changed. original idea is to make sunsets more red if next day is going
     -- to be colder: if I remember correctly, that is what red sunsets usually mean.
   windDir = vec2(0, 1), -- normalized wind direction (for clouds)
-  windSpeed = 5 -- wind speed in m/s (for clouds)
+  windSpeed = 5, -- wind speed in m/s (for clouds)
+  rain = 0
 }
 
 -- Values for randomized wind
@@ -37,48 +38,46 @@ end
 
 -- Fills a big table with values for different weathers (those values could definitely use some tweaking)
 local function fillValues(v, T)
-  v[T.NoClouds] =        { fog = 0.0, clear = 1.0, clouds = 0.0, fogTint = rgb(0.4, 0.6, 1) }
-  v[T.Clear] =           { fog = 0.0, clear = 1.0, clouds = 0.025, cloudsOpacity = 0.5, fogTint = rgb(0.4, 0.6, 1) }
-  v[T.FewClouds] =       { fog = 0.0, clear = 1.0, clouds = 0.1, fogTint = rgb(0.4, 0.6, 1) }
-  v[T.ScatteredClouds] = { fog = 0.0, clear = 1.0, clouds = 0.4, fogTint = rgb(0.4, 0.6, 1) }
-  v[T.BrokenClouds] =    { fog = 0.0, clear = 0.9, clouds = 0.8, fogTint = rgb(0.4, 0.6, 1) }
-  -- v[T.OvercastClouds] =  { fog = 0.1, clear = 0.0, clouds = 0.9, cloudsOpacity = 0.1, fogTint = rgb(1, 1, 1) }
-  v[T.OvercastClouds] =  { fog = 0.1, clear = 0.0, clouds = 0.9, cloudsOpacity = 0.5, fogTint = rgb(1, 1, 1) }
-  -- v[T.OvercastClouds] =  { fog = 0.1, clear = 0.0, clouds = 0, fogTint = rgb(1, 1, 1) }
-  v[T.Windy] =           { fog = 0.0, clear = 0.8, clouds = 0.4, lightTint = rgb(0.6, 0.8, 1), fogTint = rgb(1, 1, 1) }
-  v[T.Fog] =             { fog = 1.0, clear = 0.0, clouds = 0.0, fogTint = rgb(0.8, 0.9, 1) }
-  -- v[T.Fog] =             { fog = 1.0, clear = 0.0, clouds = 0.0, fogTint = rgb(1.4, 1.4, 1.4) }
-  v[T.Mist] =            { fog = 0.3, clear = 0.6, clouds = 0.2, fogTint = rgb(0.8, 0.9, 1) }
-  v[T.Haze] =            { fog = 0.2, clear = 0.5, clouds = 0.2, lightTint = rgb(1, 0.9, 0.8), fogTint = rgb(1, 0.6, 0.4) }
-  v[T.Dust] =            { fog = 0.3, clear = 0.9, clouds = 0.4, lightTint = rgb(0.8, 0.8, 1), fogTint = rgb(1, 0.8, 0.8) }
-  v[T.Smoke] =           { fog = 0.5, clear = 0.9, clouds = 0.6, lightTint = rgb(0.8, 0.8, 1), fogTint = rgb(1, 0.8, 0.8), saturation = 0.5 }
-  v[T.Sand] =            { fog = 0.8, clear = 0.4, clouds = 0.2, lightTint = rgb(1, 0.6, 0.4), fogTint = rgb(1, 0.6, 0.4) }
-  v[T.LightDrizzle] =    { fog = 0.1, clear = 0.3, clouds = 0.6, fogTint = rgb(0.9, 0.95, 1), wet = 0.2 }
-  v[T.Drizzle] =         { fog = 0.3, clear = 0.16, clouds = 0.8, fogTint = rgb(0.9, 0.95, 1), wet = 0.3 }
-  v[T.HeavyDrizzle] =    { fog = 0.5, clear = 0.02, clouds = 1.0, fogTint = rgb(0.9, 0.95, 1), wet = 0.4 }
-  v[T.LightRain] =       { fog = 0.2, clear = 0.0, clouds = 0.6, fogTint = rgb(0.9, 0.9, 0.9), wet = 0.6 }
-  v[T.Rain] =            { fog = 0.4, clear = 0.0, clouds = 0.8, fogTint = rgb(0.7, 0.7, 0.7), wet = 0.8 }
-  v[T.HeavyRain] =       { fog = 0.9, clear = 0.0, clouds = 1.0, lightTint = rgb(0.5, 0.5, 0.5), fogTint = rgb(0.7, 0.8, 0.9) / 0.8, wet = 1.0 }
-  v[T.LightThunderstorm] = { fog = 0.6, clear = 0.0, clouds = 1.0, lightTint = rgb(0.3, 0.3, 0.3), fogTint = rgb(0.5, 0.5, 0.6), wet = 0.8 }
-  v[T.Thunderstorm] =    { fog = 0.8, clear = 0.0, clouds = 1.0, lightTint = rgb(0.1, 0.1, 0.1), fogTint = rgb(0.4, 0.4, 0.5), wet = 0.9 }
-  v[T.HeavyThunderstorm] = { fog = 1.0, clear = 0.0, clouds = 1.0, lightTint = rgb(0, 0, 0), fogTint = rgb(0.2, 0.2, 0.3), wet = 1.0 }
+  v[T.NoClouds] =        { fog = 0.0, clear = 1.0, clouds = 0.0 }
+  v[T.Clear] =           { fog = 0.0, clear = 1.0, clouds = 0.025, cloudsOpacity = 0.5 }
+  v[T.FewClouds] =       { fog = 0.0, clear = 1.0, clouds = 0.1 }
+  v[T.ScatteredClouds] = { fog = 0.0, clear = 1.0, clouds = 0.4 }
+  v[T.BrokenClouds] =    { fog = 0.0, clear = 0.9, clouds = 0.8 }
+  v[T.OvercastClouds] =  { fog = 0.1, clear = 0.0, clouds = 0.9, cloudsOpacity = 0.5 }
+  v[T.Windy] =           { fog = 0.0, clear = 0.8, clouds = 0.4, saturation = 0.0 }
+  v[T.Fog] =             { fog = 1.0, clear = 0.0, clouds = 0.0 }
+  v[T.Mist] =            { fog = 0.8, clear = 0.6, clouds = 0.2, tint = rgb(0.8, 0.9, 1.0) }
+  v[T.Haze] =            { fog = 0.3, clear = 0.5, clouds = 0.2, tint = rgb(1, 0.92, 0.9), saturation = 0.8 }
+  v[T.Dust] =            { fog = 0.5, clear = 0.9, clouds = 0.4, tint = rgb(1, 0.85, 0.8), saturation = 0.8 }
+  v[T.Smoke] =           { fog = 0.7, clear = 0.9, clouds = 0.6, tint = rgb(0.8, 0.8, 1):scale(0.15), saturation = 0.4 }
+  v[T.Sand] =            { fog = 0.9, clear = 0.2, clouds = 0.2, tint = rgb(1, 0.6, 0.4):scale(0.5) }
+
+  v[T.LightDrizzle] =    { fog = 0.1, clear = 0.3, clouds = 0.6, wet = 0.2 }
+  v[T.Drizzle] =         { fog = 0.3, clear = 0.16, clouds = 0.8, wet = 0.3 }
+  v[T.HeavyDrizzle] =    { fog = 0.5, clear = 0.02, clouds = 1.0, wet = 0.4 }
+  v[T.LightRain] =       { fog = 0.2, clear = 0.0, clouds = 0.6, wet = 0.6 }
+  v[T.Rain] =            { fog = 0.4, clear = 0.0, clouds = 0.8, wet = 0.8 }
+  v[T.HeavyRain] =       { fog = 0.9, clear = 0.0, clouds = 1.0, tint = rgb(0.5, 0.5, 0.5), wet = 1.0 }
+  v[T.LightThunderstorm] = { fog = 0.6, clear = 0.0, clouds = 1.0, tint = rgb(0.3, 0.3, 0.3), wet = 0.8 }
+  v[T.Thunderstorm] =    { fog = 0.8, clear = 0.0, clouds = 1.0, tint = rgb(0.1, 0.1, 0.1), wet = 0.9 }
+  v[T.HeavyThunderstorm] = { fog = 1.0, clear = 0.0, clouds = 1.0, tint = rgb(0, 0, 0), wet = 1.0 }
   v[T.Squalls] =         { fog = 0.1, clear = 1.0, clouds = 1.0, saturation = 1.2 }
-  v[T.Tornado] =         { fog = 0.5, clear = 0.25, clouds = 1, fogTint = rgb(0.2, 0.2, 0.3) }
-  v[T.Hurricane] =       { fog = 0.8, clear = 0.0, clouds = 1, lightTint = rgb(), fogTint = rgb(0.2, 0.2, 0.3), wet = 1.0 }
-  v[T.LightSnow] =       { fog = 0.0, clear = 0.7, clouds = 0.4, lightTint = rgb(0.6, 0.8, 1), fogTint = rgb(0.6, 0.8, 1), saturation = 0.25 }
-  v[T.Snow] =            { fog = 0.3, clear = 0.2, clouds = 0.8, lightTint = rgb(0.6, 0.8, 1), fogTint = rgb(0.6, 0.8, 1), saturation = 0.25 }
-  v[T.HeavySnow] =       { fog = 0.5, clear = 0.1, clouds = 1.0, lightTint = rgb(0.6, 0.8, 1), fogTint = rgb(0.6, 0.8, 1), saturation = 0.25 }
-  v[T.LightSleet] =      { fog = 0.2, clear = 0.5, clouds = 0.4, lightTint = rgb(0.6, 0.8, 1), fogTint = rgb(0.6, 0.8, 1), saturation = 0.75 }
-  v[T.Sleet] =           { fog = 0.5, clear = 0.16, clouds = 0.8, lightTint = rgb(0.6, 0.8, 1), fogTint = rgb(0.6, 0.8, 1), saturation = 0.75 }
-  v[T.HeavySleet] =      { fog = 0.7, clear = 0.02, clouds = 1.0, lightTint = rgb(0.6, 0.8, 1), fogTint = rgb(0.6, 0.8, 1), saturation = 0.75 }
-  v[T.Hail] =            { fog = 0.5, clear = 0.0, clouds = 1, lightTint = rgb.new(0.5), fogTint = rgb(0.2, 0.2, 0.3) }
+  v[T.Tornado] =         { fog = 0.5, clear = 0.25, clouds = 1 }
+  v[T.Hurricane] =       { fog = 0.8, clear = 0.0, clouds = 1, tint = rgb(), wet = 1.0 }
+  v[T.LightSnow] =       { fog = 0.0, clear = 0.7, clouds = 0.4, tint = rgb(0.6, 0.8, 1), saturation = 0.25 }
+  v[T.Snow] =            { fog = 0.3, clear = 0.2, clouds = 0.8, tint = rgb(0.6, 0.8, 1), saturation = 0.25 }
+  v[T.HeavySnow] =       { fog = 0.5, clear = 0.1, clouds = 1.0, tint = rgb(0.6, 0.8, 1), saturation = 0.25 }
+  v[T.LightSleet] =      { fog = 0.2, clear = 0.5, clouds = 0.4, tint = rgb(0.6, 0.8, 1), saturation = 0.75 }
+  v[T.Sleet] =           { fog = 0.5, clear = 0.16, clouds = 0.8, tint = rgb(0.6, 0.8, 1), saturation = 0.75 }
+  v[T.HeavySleet] =      { fog = 0.7, clear = 0.02, clouds = 1.0, tint = rgb(0.6, 0.8, 1), saturation = 0.75 }
+  v[T.Hail] =            { fog = 0.5, clear = 0.0, clouds = 1, tint = rgb.new(0.5) }
 
   for k, v in pairs(v) do
     v.fog = v.fog or 0
     v.clear = v.clear or 1
     v.clouds = v.clouds or 0
     v.cloudsOpacity = v.cloudsOpacity or 1
-    v.lightTint = v.lightTint or rgb(1, 1, 1)
+    v.tint = v.tint or rgb(1, 1, 1)
     v.fogTint = v.fogTint or rgb(1, 1, 1)
     v.saturation = v.saturation or 1
     v.wet = v.wet or 0
@@ -142,12 +141,12 @@ function readConditions(dt)
   ac.getConditionsSetTo(conditions)
   updateWind(conditions, dt)  
 
-  local lagMult = math.lagMult((not SmoothTransition or counter < 10) and 0 or 0.99, dt)
+  local lagMult = math.lagMult((not SmoothTransition or counter < 10) and 0 or 0.2, dt)
   lerpConditions(conditions, lagMult, 'fog')
   lerpConditions(conditions, lagMult, 'clear')
   lerpConditions(conditions, lagMult, 'clouds')
   lerpConditions(conditions, lagMult, 'cloudsOpacity')
-  lerpConditionsRGB(conditions, lagMult, 'lightTint')
+  lerpConditionsRGB(conditions, lagMult, 'tint')
   lerpConditionsRGB(conditions, lagMult, 'fogTint')
   lerpConditions(conditions, lagMult, 'saturation')
   lerpConditions(conditions, lagMult, 'wet')
@@ -160,7 +159,8 @@ function readConditions(dt)
   applyTarget(lagMult, 'cold')
   ac.setTrackCondition('wfx_WET', CurrentConditions.wet)
   ac.setRainAmount(CurrentConditions.wet)
-  wetness = math.applyLag(wetness, CurrentConditions.wet > 0.1 and 1 or 0, 0.997, dt)  -- TODO: link to 
+  wetness = math.applyLag(wetness, CurrentConditions.wet > 0.1 and 1 or 0, 0.997, dt)
+  CurrentConditions.rain = conditions.rainIntensity
   -- ac.setRainWetness(wetness)
   -- ac.setRainWetness(0.35)
   -- ac.setRainWetness(1)

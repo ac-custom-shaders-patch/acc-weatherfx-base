@@ -54,6 +54,7 @@ function cloudutils.setPos(cloud, params)
   cloud.noTilt = params.noTilt or false
   cloud.procScale = vec2(1.0, (params.horizontal and 1 or 1.2) * aspectRatio) * (params.procScale or 1) * sizeMult
 end
+
 function cloudutils.setTexture(cloud, type)
   local index = math.floor(math.random() * type.count)
   if CloudUseAtlas then
@@ -324,6 +325,7 @@ function CloudsCell:updateDynamic(cameraPos, cellDistance, dt)
     local windDeltaC = 0
 
     c.opacity = (1 - math.saturateN(e.visibilityOffset * horDist * maxDistanceInv - 4)) * e.opacity * opacityMult
+    c.shadowOpacity = c.opacity
     if c.opacity > 0.001 then
       c.orderBy = horDist + c.size.x
       setLightPollution(c)

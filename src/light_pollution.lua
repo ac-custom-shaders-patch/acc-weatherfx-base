@@ -62,6 +62,10 @@ function updateLightPollution()
   -- garbage generated
   lightPolPos:set(lightPolData.position):sub(cameraPosition)
 
+  -- Final brightness is scaled based on conditions
+  local cc = CurrentConditions
+  local polBrightness = LightPollutionBrightness * math.lerp(math.lerp(0.1, 0.3, math.max(cc.clouds * 0.5, 1 - cc.clear)), 1, cc.fog)
+
   -- Distance from camera to pollution center
   local polDistance = #lightPolPos
 
@@ -74,7 +78,7 @@ function updateLightPollution()
 
   -- Set gradient color: use pollution tint scaled by density and brightness in settings, plus multiplied by distance 
   -- coefficient in 0.25 power. why that? looks better like that to me, that’s all
-  lightPolGradient.color:set(lightPolData.tint):scale(lightPolData.density * (distanceK ^ 0.25) * LightPollutionBrightness)
+  lightPolGradient.color:set(lightPolData.tint):scale(lightPolData.density * (distanceK ^ 0.25) * polBrightness)
 
   -- Calculating light pollution direction and size: for distant pollution (with lower distance coefficient),
   -- gradient will be at the direction towards the pollution, but direction to closer gradient moves down 
@@ -88,6 +92,8 @@ function updateLightPollution()
   -- Updating those public cached values
   LightPollutionValue = lightPolData.density * distanceK
   LightPollutionSkyFeaturesMult = 1 - LightPollutionValue * 0.9
-  LightPollutionExtraAmbient:set(lightPolData.tint):scale(LightPollutionValue * LightPollutionBrightness)
-  remoteLightPollution:set(lightPolData.tint):scale(distanceK * nightK * lightPolData.density * LightPollutionBrightness)
+  LightPollutionExtraAmbient:set(lightPolData.tint):scale(LightPollutionValue * polBrightness)
+  remoteLightPollution:set(lightPolData.tint):scale(distanceK * nightK * lightPolData.density * polBrightness)
+  
+  ac.debug('LightPollutionValue', LightPollutionValue)
 end

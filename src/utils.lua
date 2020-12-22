@@ -59,6 +59,23 @@ function RareUpdate:update(dt, forceUpdate)
   end
 end
 
+-- A thing for low frequency spatial noise
+LowFrequency2DNoise = {}
+function LowFrequency2DNoise:new(o)
+  o = o or {}
+  setmetatable(o, self)
+  self.__index = self
+  o.seedX = math.random()
+  o.seedY = math.random()
+  o.frequency = o.frequency or 1
+  return o
+end
+function LowFrequency2DNoise:get(inputPosition)
+  return math.sin(self.seedX + inputPosition.x * self.frequency * 13 / 17) 
+    * math.sin(self.seedY + inputPosition.z * self.frequency)
+    * 0.5 + 0.5
+end
+
 -- This function runs garbage collector (GC) and measures how much memory was cleaned,
 -- value is smoothed out. Call it only for debugging, as it is slow (if you’re not 
 -- calling it, LuaJIT will collect garbage automatically when necessary). And please 

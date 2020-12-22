@@ -1,6 +1,12 @@
 --------
 -- Basic WeatherFX implementation, this is the main file. Sets things up, includes a bunch of stuff and triggers updates.
 --------
+-- Please note: some of its parts work with vectors and colors. CSP defines its types for it, such as `vec3()` and `rgb()`.
+-- The thing is though, each time a new vector, for example, is created, it’ll have to be picked by garbage collector
+-- later. So to try and make it run as fast as possible, I tried to avoid creating new copies of vectors and instead
+-- using functions like `ac.calculateSkyColorTo(value)` instead of `value = ac.calculateSkyColor()`. If you would want
+-- to fork this script and make your own version of it, of course, feel free to use a more readable approach.
+--------
 
 require 'src/consts'                -- some general constant values
 require 'src/utils'                 -- helpful functions
@@ -36,14 +42,29 @@ ac.setSkyMoonTexture('textures/weather_fx/moon.dds')
 -- related to eclipses in `weather_application.lua`
 ac.setSkySunMoonSizeMultiplier(3)
 
--- Use new version applying gradients before sun
-ac.calculateSkyColor = ac.calculateSkyColorV2
-
 -- Use cloud shadow maps: in this mode, mirrors and reflections will use “ac.getCloudsShadow()” as light multiplier automatically
 ac.setCloudShadowMaps(true)
 
 -- Do not update cloud maps (like cloud shadows) without manual invalidation
 ac.setManualCloudsInvalidation(true)
+
+-- Ignore cloud.opacity and use only cloud.shadowOpacity for cloud shadows
+ac.setCloudShadowIndependantOpacity(true)
+
+-- Set cloud shadow map parameters
+ac.setCloudShadowDistance(6e3)
+ac.setCloudShadowScalingFactor(5)
+
+-- Use v2 sky shader
+ac.setSkyUseV2(true)
+
+-- Use new fog formula (instead of original AC one)
+ac.setFogAlgorithm(ac.FogAlgorithm.New)
+
+-- As time goes on, some bugs on C++ side are found, in some cases to keep things compatible, fixes need to be enabled manually
+ac.fixSkyColorCalculateResult(true)
+ac.fixSkyColorCalculateOrder(true)
+ac.fixSkyV2Fog(true)
 
 -- Called each 3rd frame or if sun moved
 function rareUpdate1(dt)
@@ -51,13 +72,14 @@ function rareUpdate1(dt)
   applySky()
   applyLight() 
   applyAmbient()
-  applyFog()
+  applyFog(dt)
   applySkyFeatures()
   applyAdaptiveShadows()
 end
 
 -- Called each 3rd frame, but with an offset, to spread the load
 function rareUpdate2(dt)
+  applyHeatFactor()
   updateLightPollution(dt)
   updateCloudMaterials(dt)
 end
@@ -118,5 +140,5 @@ function update(dt)
   applyFakeExposure(dt)
 
   -- Uncomment to check how much garbage is generated each frame (slows things down)
-  -- runGC()
+  runGC()
 end
