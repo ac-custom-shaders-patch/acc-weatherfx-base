@@ -21,17 +21,19 @@ ac.skipSaneChecks()
 
 -- Since we’re going to use v2 of clouds, here we can set cloud map parameters
 local cloudMap = ac.SkyCloudMapParams.new()
+
 cloudMap.perlinFrequency = 4.0
 cloudMap.perlinOctaves = 7
-cloudMap.worleyFrequency = 4.0
+cloudMap.worleyFrequency = 3.0
 cloudMap.shapeMult = 20.0
 cloudMap.shapeExp = 0.5
 cloudMap.shape0Mip = 0
-cloudMap.shape0Contribution = 0.1
-cloudMap.shape1Mip = 3.2
-cloudMap.shape1Contribution = 1.0
-cloudMap.shape2Mip = 4.5
+cloudMap.shape0Contribution = 0.2
+cloudMap.shape1Mip = 2.2
+cloudMap.shape1Contribution = 0.5
+cloudMap.shape2Mip = 3.5
 cloudMap.shape2Contribution = 1.0
+
 ac.generateCloudMap(cloudMap)
 
 -- Loading textures for sky stuff
@@ -53,10 +55,11 @@ ac.setCloudShadowIndependantOpacity(true)
 
 -- Set cloud shadow map parameters
 ac.setCloudShadowDistance(6e3)
-ac.setCloudShadowScalingFactor(5)
+ac.setCloudShadowScalingFactor(1)
 
 -- Use v2 sky shader
 ac.setSkyUseV2(true)
+ac.setCloudArcMultiplier(1)
 
 -- Use new fog formula (instead of original AC one)
 ac.setFogAlgorithm(ac.FogAlgorithm.New)
@@ -65,6 +68,12 @@ ac.setFogAlgorithm(ac.FogAlgorithm.New)
 ac.fixSkyColorCalculateResult(true)
 ac.fixSkyColorCalculateOrder(true)
 ac.fixSkyV2Fog(true)
+ac.fixCloudsV2Fog(true)
+
+-- Disable cars exposure values, reset camera exposure
+-- ac.setCarExposureActive(false)
+-- ac.setCameraExposure(33)
+-- ac.setCloudShadowIndependantOpacity(false)
 
 -- Called each 3rd frame or if sun moved
 function rareUpdate1(dt)
@@ -87,7 +96,6 @@ end
 local lastSunDir = vec3()
 local lastCameraPos = vec3()
 local lastGameTime = 0
-local cloudsDtSmooth = 0
 local ruBase = RareUpdate:new{ callback = rareUpdate1 }
 local ruCloudMaterials = RareUpdate:new{ callback = rareUpdate2, phase = 1 }
 local ruClouds = RareUpdate:new{ callback = updateClouds, phase = 2 }
@@ -95,16 +103,20 @@ local ruClouds = RareUpdate:new{ callback = updateClouds, phase = 2 }
 function getCloudsDeltaT(dt, gameDT)
   local gameTime = ac.getCurrentTime()
   local cloudsDeltaTime = gameTime - lastGameTime
-  local cloudsDeltaTimeAdj = math.sign(cloudsDeltaTime) * math.abs(cloudsDeltaTime) / (1 + math.abs(cloudsDeltaTime))
   lastGameTime = gameTime
-  cloudsDtSmooth = math.applyLag(cloudsDtSmooth, 
-    math.lerp(math.clamp(cloudsDeltaTimeAdj, -1, 1), gameDT, CloudFixedSpeed),
-    0.9, dt)
-  return cloudsDtSmooth
+  local cloudsDeltaTimeAdj = math.sign(cloudsDeltaTime) * math.abs(cloudsDeltaTime) / (1 + math.abs(cloudsDeltaTime))
+  return math.lerp(math.clamp(cloudsDeltaTimeAdj, -10, 10), gameDT, CloudFixedSpeed)
 end
 
 -- Called every frame
 function update(dt)
+  -- if true then
+  --   -- ac.setLightDirection(vec3(0, 1, 1))
+  --   -- ac.setLightColor(rgb(10, 10, 10))
+  --   ruBase:update(gameDT, forceUpdate)
+  --   return 0
+  -- end
+
   -- This value is time passed in seconds (as dt), but taking into account pause, slow 
   -- motion or fast forward, but not time scale in conditions
   local gameDT = ac.getGameDeltaT()
@@ -127,7 +139,9 @@ function update(dt)
   ruCloudMaterials:update(gameDT, forceUpdate)
 
   -- Increasing refresh rate for faster moving clouds
-  if math.abs(cloudsDT) > 0.05 then 
+  if math.abs(cloudsDT) > 0.5 then 
+    ruClouds.skip = 0
+  elseif math.abs(cloudsDT) > 0.05 then 
     ruClouds.skip = 1
   elseif math.abs(cloudsDT) < 0.03 then 
     ruClouds.skip = 2
@@ -140,5 +154,11 @@ function update(dt)
   applyFakeExposure(dt)
 
   -- Uncomment to check how much garbage is generated each frame (slows things down)
-  runGC()
+  -- runGC()
+
+  -- ac.setAutoExposureActive(false)
+  -- ac.setAutoExposureMeasuringArea(vec2(0.5, 0.25), vec2(0.4, 0.4))
+  -- ac.setAutoExposureTarget(100)
+  -- ac.setAutoExposureInfluencedByGlare(false)
+  -- ac.setAutoExposureLimits(0, 0.22)
 end

@@ -37,7 +37,7 @@ function setLightPollution(cloud)
     local distance = math.horizontalDistance(cloud.position, lightPolPos) + math.max((cloud.position.y - 5000) * 10, 0)
     local distanceK = math.saturate(lightPolData.radius / math.max(distance - lightPolData.radius, 1))
     cloud.extraDownlit:set(lightPolData.tint)
-      :scale(math.max(lightPolDistanceK + distanceK * 0.5, distanceK) * nightK * lightPolData.density * LightPollutionBrightness)
+      :scale(math.max(lightPolDistanceK + distanceK * 0.5, distanceK) * nightK * lightPolData.density * LightPollutionBrightness * 0.25)
   else
     cloud.extraDownlit.r = 0
     cloud.extraDownlit.g = 0
@@ -94,6 +94,4 @@ function updateLightPollution()
   LightPollutionSkyFeaturesMult = 1 - LightPollutionValue * 0.9
   LightPollutionExtraAmbient:set(lightPolData.tint):scale(LightPollutionValue * polBrightness)
   remoteLightPollution:set(lightPolData.tint):scale(distanceK * nightK * lightPolData.density * polBrightness)
-  
-  ac.debug('LightPollutionValue', LightPollutionValue)
 end
