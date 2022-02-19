@@ -32,12 +32,12 @@ local remoteLightPollution = rgb()
 
 -- This public function updates cloud downlit value depending on its position relative to light pollution
 -- (cloud position is set relative to camera, so it uses lightPolPos)
-function setLightPollution(cloud)
-  if nightK > 0 then
+function SetLightPollution(cloud)
+  if NightK > 0 then
     local distance = math.horizontalDistance(cloud.position, lightPolPos) + math.max((cloud.position.y - 5000) * 10, 0)
     local distanceK = math.saturate(lightPolData.radius / math.max(distance - lightPolData.radius, 1))
     cloud.extraDownlit:set(lightPolData.tint)
-      :scale(math.max(lightPolDistanceK + distanceK * 0.5, distanceK) * nightK * lightPolData.density * LightPollutionBrightness * 0.25)
+      :scale(math.max(lightPolDistanceK + distanceK * 0.5, distanceK) * NightK * lightPolData.density * LightPollutionBrightness * 0.25)
   else
     cloud.extraDownlit.r = 0
     cloud.extraDownlit.g = 0
@@ -46,7 +46,7 @@ function setLightPollution(cloud)
 end
 
 -- Returns remote light pollution for distant clouds
-function getRemoteLightPollution()
+function GetRemoteLightPollution()
   return remoteLightPollution
 end
 
@@ -55,7 +55,7 @@ end
 local cameraPosition = vec3()
 
 -- Update light pollution position, gradient, global variables
-function updateLightPollution()  
+function UpdateLightPollution()  
   ac.getCameraPositionTo(cameraPosition)
 
   -- Could use `lightPolPos = lightPolData.position - cameraPosition`, but this way, there is no
@@ -93,5 +93,5 @@ function updateLightPollution()
   LightPollutionValue = lightPolData.density * distanceK
   LightPollutionSkyFeaturesMult = 1 - LightPollutionValue * 0.9
   LightPollutionExtraAmbient:set(lightPolData.tint):scale(LightPollutionValue * polBrightness)
-  remoteLightPollution:set(lightPolData.tint):scale(distanceK * nightK * lightPolData.density * polBrightness)
+  remoteLightPollution:set(lightPolData.tint):scale(distanceK * NightK * lightPolData.density * polBrightness)
 end

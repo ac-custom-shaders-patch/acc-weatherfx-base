@@ -7,18 +7,13 @@
 -- Local state (will be updated with values from `conditions_converter.lua`)
 local windDir = vec2(1, 0)
 local windSpeed = 0
-
--- How many textures of different types are available, with sizes and offsets in the atlas
-local CloudTextures = {
-  Blurry = { group = 'b', count = 16, start = vec2(0, 0/8), size = vec2(2/16, 1/8) },
-  Hovering = { group = 'h', count = 16, start = vec2(0, 2/8), size = vec2(2/16, 1/8) },
-  Spread = { group = 's', count = 6, start = vec2(0, 4/8), size = vec2(2/16, 1/8) },
-  Flat = { group = 'f', count = 5, start = vec2(0, 6/8), size = vec2(2/16, 1/8) },
-  Bottoms = { group = 'd', count = 5, start = vec2(0, 7/8), size = vec2(1/16, 1/8) },
-}
+local windAngle = 0
 
 -- Calculates base Y coordinate of a cloud from a circle of clouds near horizon
 require 'src/weather_clouds_pertrack'
+
+-- Different types of clouds
+require 'src/weather_clouds_types'
 
 -- Creates a new cloud and sets it using `fn`, which would be one of `CloudTypes` functions
 local function createCloud(fn, arg1, arg2)
@@ -41,193 +36,19 @@ local function createCloud(fn, arg1, arg2)
   return cloud
 end
 
--- Various helper functions for clouds
-local cloudutils = {}
-function cloudutils.setPos(cloud, params)
-  params = params or {}
-  local height = params.height or 100 + math.random() * 200
-  local sizeMult = params.size or 1
-  local aspectRatio = params.aspectRatio or 0.5
-  local distanceMult = params.distance or 10
-  local pos = params.pos and params.pos:clone():normalize() or math.randomVec2():normalize()
-  cloud.size = vec2(100, 100 * aspectRatio) * sizeMult * (1 + 0.5 * math.random()) * distanceMult
-  cloud.position = vec3(400 * pos.x, height, 400 * pos.y) * distanceMult
-  cloud.horizontal = params.horizontal or false
-  cloud.customOrientation = params.customOrientation or false
-  cloud.noTilt = params.noTilt or false
-  cloud.procScale = vec2(1.0, (params.horizontal and 1 or 1.2) * aspectRatio) * (params.procScale or 1) * sizeMult
-end
-
-function cloudutils.setTexture(cloud, type)
-  local index = math.floor(math.random() * type.count)
-  if CloudUseAtlas then
-    local start = type.start:clone()
-    for i = 1, index do
-      start.x = start.x + type.size.x
-      if start.x >= 1 then
-        start.x = start.x - 1
-        start.y = start.y + type.size.y
-      end
-    end
-    cloud.texStart:set(start)
-    cloud.texSize:set(type.size)
-    cloud:setTexture('clouds/atlas.dds')
-  else 
-    cloud:setTexture('clouds/' .. type.group .. index .. '.png')
+local function transitionHeadingAngle(current, target, dt)
+  if current == -1 then return target end
+  local delta = target - current
+  if delta > 180 then
+    delta = 360 - delta
+  elseif delta < -180 then
+    delta = 360 + delta
   end
-  cloud.flipHorizontal = math.random() > 0.5
-  return index
-end
-function cloudutils.setProcNormalShare(cloud, globalShare, totalIntensity)
-  globalShare = globalShare or 0.5
-  totalIntensity = totalIntensity or 1
-  cloud.procNormalScale = vec2((1 - globalShare) * totalIntensity, globalShare * totalIntensity)
+  return current + (target - current) * math.min(dt, 0.1) * math.lerpInvSat(windSpeed, 5, 100) * 0.1
 end
 
--- Different types of clouds
-local CloudTypes = {}
-function CloudTypes.Basic(cloud, pos)
-  cloudutils.setTexture(cloud, CloudTextures.Blurry)
-  cloud.procMap = vec2(0.6, 0.85) + math.random() * 0.15
-  cloud.procSharpnessMult = math.random()
-  cloudutils.setProcNormalShare(cloud, 0.6)
-  cloudutils.setPos(cloud, { 
-    pos = pos, 
-    size = (1 + math.random()) * 2, 
-    procScale = 0.45 
-  })
-end
-function CloudTypes.Dynamic(cloud, pos)
-  local typeRandom = math.random()
-  local shapeRandom = math.random()
-  local scaleRandom = math.random() ^ 2
-  local blobRandom = math.gaussianAdjustment(math.random(), 2)
-  local sizeRandom = math.gaussianAdjustment(math.random(), 2)
-
-  -- local typeRandom = 0.95
-  -- local shapeRandom = 0
-  -- local scaleRandom = 1
-  -- local blobRandom = 0
-  -- local sizeRandom = 1
-
-  if typeRandom > 0.95 then
-    -- Let’s increase variety some more
-    cloudutils.setTexture(cloud, CloudTextures.Hovering)
-  elseif typeRandom > 0.9 then
-    -- Let’s increase variety some more
-    cloudutils.setTexture(cloud, CloudTextures.Spread)
-  else
-    cloudutils.setTexture(cloud, CloudTextures.Blurry)
-  end
-  cloud.occludeGodrays = true
-
-  cloud.procMap = vec2(0.75 - blobRandom * 0.2, 0.93 - blobRandom * 0.1) + shapeRandom * 0.08
-  cloud.procSharpnessMult = math.lerp(0.6, 0, blobRandom)
-  cloud.extraFidelity = math.lerp(0.8, 0.1, math.max(scaleRandom, blobRandom))
-  cloud.receiveShadowsOpacityMult = 1
-  cloudutils.setProcNormalShare(cloud, math.lerp(0.2, 0.6, blobRandom), 2)
-  cloudutils.setPos(cloud, { 
-    pos = pos, 
-    size = (1 + sizeRandom) * math.lerp(1.8, 2.2, blobRandom) * CloudSpawnScale, 
-    procScale = (1 + sizeRandom) * math.lerp(math.lerp(0.3, 0.5, scaleRandom), .7, blobRandom) * 0.5 / CloudSpawnScale
-  })
-
-  cloud.extras.procMap = cloud.procMap:clone()
-  cloud.extras.nearbyCutoffOffset = math.lerp(-0.3, 0.3, math.random())
-  cloud.extras.extraFidelity = cloud.extraFidelity
-  cloud.extras.lowerK = math.lerpInvSat(pos.y, DynCloudsMaxHeight, DynCloudsMinHeight)
-end
-function CloudTypes.Bottom(cloud, mainCloud)
-  cloudutils.setTexture(cloud, CloudTextures.Bottoms)
-  cloud.occludeGodrays = true
-  cloud.horizontal = true
-  cloud.horizontalHeading = math.random() * 360
-  cloud.procScale:set(1, 1)
-  cloud.procMap = mainCloud.procMap * vec2(0.8, 1)
-  cloud.procSharpnessMult = mainCloud.procSharpnessMult
-  cloud.extraFidelity = mainCloud.extraFidelity
-  local size = (mainCloud.size.x + mainCloud.size.y) / 2
-  cloud.size:set(size, size)
-  cloudutils.setProcNormalShare(cloud, 0.2, 1.8)
-  cloud.material = CloudMaterials.Bottom
-  cloud.receiveShadowsOpacityMult = mainCloud.receiveShadowsOpacityMult
-end
-function CloudTypes.Hovering(cloud, pos)
-  cloudutils.setTexture(cloud, CloudTextures.Hovering)
-  cloud.procMap = vec2(0.8, 0.9) + math.random() * 0.15
-  cloud.procSharpnessMult = 0
-  cloud.extraFidelity = 0.6
-  cloudutils.setProcNormalShare(cloud, 0.2, 2)
-  cloudutils.setPos(cloud, { 
-    pos = pos, 
-    horizontal = true,
-    size = math.lerp(8, 12, math.random()) * CloudSpawnScale, 
-    procScale = 0.1 / CloudSpawnScale
-  })
-  cloud.horizontalHeading = math.atan2(windDir.y, -windDir.x) * 180 / math.pi + math.random() * 120 - 60
-  cloud.material = CloudMaterials.Hovering
-end
-function CloudTypes.Spread(cloud, pos)
-  cloudutils.setTexture(cloud, CloudTextures.Spread)
-  cloud.procMap = vec2(0.4, 1)
-  cloud.procSharpnessMult = 0
-  cloud.extraFidelity = 1
-  cloudutils.setProcNormalShare(cloud, 0.2)
-  local isSpread = math.random() > 0.5
-  cloudutils.setPos(cloud, { 
-    pos = pos, 
-    horizontal = true,
-    size = math.lerp(4, 6, math.random()) * CloudSpawnScale, 
-    procScale = 0.1 / CloudSpawnScale,
-    aspectRatio = 0.33
-  })
-  cloud.horizontalHeading = math.atan2(windDir.y, -windDir.x) * 180 / math.pi + math.random() * 20 - 10
-  cloud.material = CloudMaterials.Spread
-  cloud.procScale:mul(vec2(1, 4))
-  cloud.opacity = math.lerp(0.15, 0.35, math.random())
-end
-function CloudTypes.Low(cloud, pos, distance)
-  local index = cloudutils.setTexture(cloud, CloudTextures.Flat)
-  local heightFixes = { 0, 4, -10 }
-  cloud.occludeGodrays = true
-  cloud.procMap = vec2(0.65, 0.95)
-  cloud.procSharpnessMult = math.random() * 0.5
-  cloud.extraFidelity = 1.2
-  cloud.color = rgb(1, 1, 1)
-  cloud.opacity = 0.8
-  -- cloud.fogMultiplier = 5
-  cloud.orderBy = 1e12 + distance * 1e10
-  cloud.extras.opacity = cloud.opacity
-  cloud.extras.extraFidelity = cloud.extraFidelity
-  cloud.extras.procMap = cloud.procMap:clone()
-  cloudutils.setProcNormalShare(cloud, 0.2, 2)
-  cloudutils.setPos(cloud, { 
-    pos = pos, 
-    height = calculateHorizonCloudYCoordinate(pos:clone():normalize()) - 5 * distance + (heightFixes[index + 1] or 0), 
-    distance = 50 + distance, 
-    size = 1.3, 
-    aspectRatio = 0.3
-  })
-  cloud.receiveShadowsOpacityMult = 0
-end
-function CloudTypes.Test(cloud, pos, distance)
-  local index = cloudutils.setTexture(cloud, CloudTextures.Bottoms)
-  cloud.occludeGodrays = true
-  cloud.procMap = vec2(0.65, 0.85)
-  cloud.procSharpnessMult = 0
-  cloud.extraFidelity = 0
-  cloud.color = rgb(1, 1, 1)
-  cloud.opacity = 1
-  cloud.orderBy = 0
-  cloud.cutoff = 0
-  cloudutils.setProcNormalShare(cloud, 0, 2)
-  cloudutils.setPos(cloud, { 
-    pos = pos, 
-    size = 7, 
-    procScale = 1
-  })
-  cloud.receiveShadowsOpacityMult = 0
-end
+local nightEarlyK = 0
+local nightEarlySmoothK = -1
 
 local CloudsCell = {}
 function CloudsCell:new(o)
@@ -317,6 +138,8 @@ function CloudsCell:updateHovering(cameraPos, cellDistance, dt)
         c.orderBy = math.dot(c.position, c.position) + 1e9
       end
       c.opacity = c.opacity * (0.5 + 0.5 * CurrentConditions.clouds) * (1 - weatherCutoff)
+      c.extraFidelity = math.lerp(c.extras.extraFidelity, -2, nightEarlyK)
+      c.horizontalHeading = transitionHeadingAngle(c.horizontalHeading, windAngle, dt)
 
       local up = windDir.x * c.up.x + windDir.y * c.up.z
       local side = windDir.x * c.side.x + windDir.y * c.side.z
@@ -339,16 +162,16 @@ function CloudsCell:updateDynamic(cameraPos, cellDistance, dt)
 
   local windDelta = windSpeed * dt * CloudShapeMovingSpeed
   local shapeShiftingDelta = dt * CloudShapeShiftingSpeed
-  local maxDistanceInv = 5 / (cellDistance * CloudCellSize)
+  -- local maxDistanceInv = 5 / (cellDistance * CloudCellSize)
   local fadeNearbyInv = 500 / CloudFadeNearby
   local ccClouds = CurrentConditions.clouds
   -- local opacityMult = 1 - 0.2 * ccClouds
   local opacityMult = 1
-  local procMapLerp = math.max(0, CurrentConditions.clouds - 0.5)
-  local nightEarlyK = math.lerpInvSat(sunDir.y, 0.1, -0.05)
-  local extraThick = math.max(math.lerpInvSat(CurrentConditions.clear, 1, 0.5), nightEarlyK)
+  local extraThick = math.lerpInvSat(CurrentConditions.clear, 1, 0.5)
   local cloudDark = math.max((1 - CurrentConditions.clear) * 0.5, CurrentConditions.cloudsDensity)
-  local cloudsHeight = math.lerp(1, 0.5, math.max(nightK * 0.5, CurrentConditions.cloudsDensity))
+  local cloudsHeight = math.lerp(1, 0.5, CurrentConditions.cloudsDensity)
+  local mapYMult = math.lerp(1, 1.2, nightEarlyK)
+  local procScaleMult = math.lerp(1, 0.8, nightEarlySmoothK)
 
   for i = 1, self.cloudsCount do
     local e = self.clouds[i]
@@ -368,6 +191,11 @@ function CloudsCell:updateDynamic(cameraPos, cellDistance, dt)
       * math.saturateN(1 - fullDist / (4 * CloudCellDistance * CloudCellSize))
       * math.saturateN(fullDist / 200 - 1)
     c.shadowOpacity = c.opacity
+
+    local lookingFromBelow = math.saturateN(c.position.y / fullDist)
+    c.normalYExponent = 1 + 2 * lookingFromBelow
+    c.topFogBoost = 0.2 * lookingFromBelow
+
     if c.opacity > 0.001 then
       if not c.passedFrustumTest then 
         c.orderBy = fullDist
@@ -381,11 +209,11 @@ function CloudsCell:updateDynamic(cameraPos, cellDistance, dt)
     end
 
     if c.cutoff < 0.999 and c.opacity > 0.001 then
-      setLightPollution(c)
+      SetLightPollution(c)
 
-      c.extraFidelity = math.lerp(c.extras.extraFidelity, 0, nightEarlyK)
-      c.procMap.x = math.lerp(c.extras.procMap.x, c.extras.procMap.x * 0.5, extraThick)
-      c.procMap.y = math.lerp(c.extras.procMap.y, c.extras.procMap.x, procMapLerp)
+      c.extraFidelity = math.lerp(c.extras.extraFidelity, -2, nightEarlyK)
+      c.procMap.x = math.lerp(c.extras.procMap.x, c.extras.procMap.x * 0.5, extraThick) / mapYMult
+      c.procScale:set(c.extras.procScale):scale(procScaleMult)
 
       local fwd = windDir.x * c.position.x / horDist + windDir.y * c.position.z / horDist
       local side = windDir.x * c.position.z / horDist + windDir.y * -c.position.x / horDist
@@ -440,7 +268,7 @@ end
 local cloudCellRadius = #vec2.new(CloudCellSize)
 function CloudsCell:update(cameraPos, cellDistance, dt)
   local isVisible = ac.testFrustumIntersection(vec3.tmp():set(self.center):sub(cameraPos), cloudCellRadius)
-  local updateRate = not isVisible and 2 or 0
+  local updateRate = not isVisible and 10 or 0
   if self.updateDelay >= updateRate then
     if not self.initialized then
       self:initialize()
@@ -455,7 +283,7 @@ function CloudsCell:update(cameraPos, cellDistance, dt)
     self:updateHovering(cameraPos, cellDistance, dt)
     self:updateDynamic(cameraPos, cellDistance, dt)
   else
-    self.updateDelay = self.updateDelay + math.abs(dt)
+    self.updateDelay = self.updateDelay + 1
   end
 end
 function CloudsCell:deactivate() 
@@ -540,7 +368,6 @@ local function updateCloudCells(dt)
 
   activeIndex = activeIndex + 1
   if activeIndex > 1e6 then activeIndex = 0 end
-  if activeIndex > 20 then pause = true end
 
   ac.getCameraPositionTo(cameraPos)
   ac.fixHeadingInvSelf(cameraPos)
@@ -592,7 +419,7 @@ local function addStaticCloud(cloud)
 end
 local function updateStaticClouds(dt)
   local cutoff = math.saturate(1.1 - CurrentConditions.clouds * 1.5) ^ 2
-  local lightPollution = getRemoteLightPollution()
+  local lightPollution = GetRemoteLightPollution()
   local dtLocal = math.min(dt, 0.05)
   local procMapLerp = math.max(0, CurrentConditions.clouds - 0.5)
   for i = 1, staticCloudsCount do
@@ -619,11 +446,15 @@ end
 -- local testCloud = createCloud(CloudTypes.Dynamic, vec3(0, 1, 2), 0)
 -- ac.weatherClouds[#ac.weatherClouds + 1] = testCloud
 
-function updateClouds(dt)
+function UpdateClouds(dt)
   windDir = CurrentConditions.windDir
   windSpeed = CurrentConditions.windSpeed * 4 -- clouds move faster up there
+  windAngle = math.atan2(windDir.y, -windDir.x) * 180 / math.pi + math.random() * 20 - 10
 
   -- testCloud.procShapeShifting = testCloud.procShapeShifting + dt * 0.1
+
+  nightEarlyK = math.smoothstep(math.lerpInvSat(SunDir.y, 0.3, -0.05))
+  nightEarlySmoothK = nightEarlySmoothK == -1 and nightEarlyK or math.applyLag(nightEarlySmoothK, nightEarlyK, 0.99, ac.getSimState().dt)
 
   updateCloudCells(dt)
   updateStaticClouds(dt)

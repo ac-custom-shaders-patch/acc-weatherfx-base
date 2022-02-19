@@ -35,11 +35,13 @@ end
 local function fillValues(v, T)
   v[T.NoClouds] =          { fog = 0.0, clear = 1.0, clouds = 0.0 }
   v[T.Clear] =             { fog = 0.0, clear = 1.0, clouds = 0.01 }
-  v[T.FewClouds] =         { fog = 0.0, clear = 1.0, clouds = 0.1 }
-  v[T.ScatteredClouds] =   { fog = 0.0, clear = 1.0, clouds = 0.4 }
-  v[T.BrokenClouds] =      { fog = 0.0, clear = 0.9, clouds = 0.8 }
+  v[T.FewClouds] =         { fog = 0.0, clear = 1.0, clouds = 0.3 }
+  v[T.ScatteredClouds] =   { fog = 0.0, clear = 1.0, clouds = 0.5 }
+  v[T.BrokenClouds] =      { fog = 0.0, clear = 0.9, clouds = 0.7 }
   v[T.OvercastClouds] =    { fog = 0.1, clear = 0.0, clouds = 1.0 }
-  v[T.Windy] =             { fog = 0.0, clear = 0.8, clouds = 0.4, saturation = 0.0 }
+  v[T.Windy] =             { fog = 0.0, clear = 0.8, clouds = 0.6, saturation = 0.0 }
+  v[T.Cold] =              { fog = 0.3, clear = 0.9, clouds = 0.4, saturation = 0.5, tint = rgb(0.8, 0.9, 1.0) }
+  v[T.Hot] =               { fog = 0.1, clear = 1.0, clouds = 0.1, saturation = 1.2, tint = rgb(1.0, 0.9, 0.8) }
   v[T.Fog] =               { fog = 1.0, clear = 0.0, clouds = 0.0 }
   v[T.Mist] =              { fog = 0.8, clear = 0.6, clouds = 0.2, tint = rgb(0.8, 0.9, 1.0) }
   v[T.Haze] =              { fog = 0.3, clear = 0.5, clouds = 0.2, tint = rgb(1, 0.92, 0.9), saturation = 0.8 }
@@ -110,13 +112,13 @@ local function applyLagRGB(v, r, g, b, lagMult, dt)
   v.b = v.b + (b - v.b) * lagMult
 end
 
-local function lerpConditionsRGB(conditions, lagMult, key)
+local function lerpConditionsRGB(conditions, lagMult, key, dt)
   local vc = values[conditions.currentType]
   local vu = values[conditions.upcomingType]
   if not vc then ac.debug('Unknown type', conditions.currentType) end
   if not vu then ac.debug('Unknown type', conditions.upcomingType) end
   
-  local a = vc[key]
+  local a = vc[key] 
   local b = vu[key]
   local lr = math.lerp(a and a.r, b and b.r, conditions.transition)
   local lg = math.lerp(a and a.g, b and b.g, conditions.transition)
@@ -127,18 +129,18 @@ end
 -- Read conditions and keep them here
 local conditionsMem = ac.getConditionsSet()
 
-function readConditions(dt)
+function ReadConditions(dt)
   -- Update existing conditions instead of re-reading them to make garbage collector’s life easier
   local conditions = conditionsMem
   ac.getConditionsSetTo(conditions)
-  updateWind(conditions, dt)  
+  updateWind(conditions, dt)
 
-  local lagMult = math.lagMult((not SmoothTransition or counter < 10) and 0 or 0.2, dt)
+  local lagMult = math.lagMult((not SmoothTransition or counter < 10) and 0 or 0.95, dt)
   lerpConditions(conditions, lagMult, 'fog')
   lerpConditions(conditions, lagMult, 'clear')
   lerpConditions(conditions, lagMult, 'clouds')
   lerpConditions(conditions, lagMult, 'cloudsDensity')
-  lerpConditionsRGB(conditions, lagMult, 'tint')
+  lerpConditionsRGB(conditions, lagMult, 'tint', dt)
   lerpConditions(conditions, lagMult, 'saturation')
 
   CurrentConditions.wet = conditions.rainWetness

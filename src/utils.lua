@@ -82,7 +82,7 @@ end
 -- try and keep amount of garbage low.
 local gcSmooth = 0
 local gcRuns = 0
-function runGC()
+function RunGC() 
   local before = collectgarbage('count')
   collectgarbage()
   gcSmooth = math.applyLag(gcSmooth, before - collectgarbage('count'), gcRuns < 50 and 0.9 or 0.995, 0.01)
