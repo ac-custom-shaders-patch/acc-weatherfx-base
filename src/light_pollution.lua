@@ -64,7 +64,7 @@ function UpdateLightPollution()
 
   -- Final brightness is scaled based on conditions
   local cc = CurrentConditions
-  local polBrightness = LightPollutionBrightness * math.lerp(math.lerp(0.1, 0.3, math.max(cc.clouds * 0.5, 1 - cc.clear)), 1, cc.fog)
+  local polBrightness = LightPollutionBrightness * math.lerp(0.3, 1, math.lerp(math.lerp(0.1, 0.3, math.max(cc.clouds * 0.5, 1 - cc.clear)), 1, cc.fog))
 
   -- Distance from camera to pollution center
   local polDistance = #lightPolPos

@@ -12,7 +12,8 @@ CurrentConditions = {
   saturation = 1, -- how saturated are the colors
   windDir = vec2(0, 1), -- normalized wind direction (for clouds)
   windSpeed = 5, -- wind speed in m/s (for clouds)
-  rain = 0
+  rain = 0,
+  thunder = 0
 }
 
 -- Values for randomized wind
@@ -42,8 +43,8 @@ local function fillValues(v, T)
   v[T.Windy] =             { fog = 0.0, clear = 0.8, clouds = 0.6, saturation = 0.0 }
   v[T.Cold] =              { fog = 0.3, clear = 0.9, clouds = 0.4, saturation = 0.5, tint = rgb(0.8, 0.9, 1.0) }
   v[T.Hot] =               { fog = 0.1, clear = 1.0, clouds = 0.1, saturation = 1.2, tint = rgb(1.0, 0.9, 0.8) }
-  v[T.Fog] =               { fog = 1.0, clear = 0.0, clouds = 0.0 }
-  v[T.Mist] =              { fog = 0.8, clear = 0.6, clouds = 0.2, tint = rgb(0.8, 0.9, 1.0) }
+  v[T.Fog] =               { fog = 1.0, clear = 0.1, clouds = 0.0 }
+  v[T.Mist] =              { fog = 0.6, clear = 0.6, clouds = 0.2, tint = rgb(0.8, 0.9, 1.0) }
   v[T.Haze] =              { fog = 0.3, clear = 0.5, clouds = 0.2, tint = rgb(1, 0.92, 0.9), saturation = 0.8 }
   v[T.Dust] =              { fog = 0.5, clear = 0.9, clouds = 0.2, tint = rgb(1, 0.85, 0.8), saturation = 0.8 }
   v[T.Smoke] =             { fog = 0.7, clear = 0.9, clouds = 0.8, tint = rgb(0.8, 0.8, 1):scale(0.15), saturation = 0.4 }
@@ -51,13 +52,13 @@ local function fillValues(v, T)
 
   v[T.LightDrizzle] =      { fog = 0.1, clear = 0.9, clouds = 0.7, cloudsDensity = 0.2, saturation = 0.5 }
   v[T.Drizzle] =           { fog = 0.3, clear = 0.7, clouds = 0.8, cloudsDensity = 0.4, tint = rgb(0.9, 0.95, 1.0) }
-  v[T.HeavyDrizzle] =      { fog = 0.5, clear = 0.5, clouds = 0.9, cloudsDensity = 0.6, tint = rgb(0.8, 0.9, 1.0) }
+  v[T.HeavyDrizzle] =      { fog = 0.5, clear = 0.5, clouds = 0.9, cloudsDensity = 0.6, tint = rgb(0.8, 0.9, 1.0), thunder = 0.1 }
   v[T.LightRain] =         { fog = 0.2, clear = 0.8, clouds = 0.6, cloudsDensity = 0.3 }
   v[T.Rain] =              { fog = 0.4, clear = 0.05, clouds = 0.9, cloudsDensity = 0.5 }
-  v[T.HeavyRain] =         { fog = 1.0, clear = 0.0, clouds = 1.0, cloudsDensity = 0.8 }
-  v[T.LightThunderstorm] = { fog = 0.4, clear = 0.2, clouds = 0.9, cloudsDensity = 0.8 }
-  v[T.Thunderstorm] =      { fog = 0.8, clear = 0.0, clouds = 1.0, cloudsDensity = 0.9, tint = rgb.new(0.5) }
-  v[T.HeavyThunderstorm] = { fog = 1.0, clear = 0.0, clouds = 1.0, cloudsDensity = 1.0, tint = rgb.new(0.2) }
+  v[T.HeavyRain] =         { fog = 0.8, clear = 0.0, clouds = 1.0, cloudsDensity = 0.8, thunder = 0.2 }
+  v[T.LightThunderstorm] = { fog = 0.4, clear = 0.2, clouds = 0.9, cloudsDensity = 0.8, thunder = 0.4 }
+  v[T.Thunderstorm] =      { fog = 0.8, clear = 0.0, clouds = 1.0, cloudsDensity = 0.9, tint = rgb.new(0.5), thunder = 0.6 }
+  v[T.HeavyThunderstorm] = { fog = 0.9, clear = 0.0, clouds = 1.0, cloudsDensity = 1.0, tint = rgb.new(0.2), thunder = 0.8 }
   v[T.LightSnow] =         { fog = 0.2, clear = 0.8, clouds = 0.4, cloudsDensity = 0.3, tint = rgb(0.8, 0.9, 1.0) }
   v[T.Snow] =              { fog = 0.4, clear = 0.05, clouds = 0.6, cloudsDensity = 0.5, tint = rgb(0.6, 0.8, 1.0) }
   v[T.HeavySnow] =         { fog = 1.0, clear = 0.0, clouds = 0.8, cloudsDensity = 0.8, tint = rgb(0.4, 0.7, 1.0) }
@@ -67,8 +68,8 @@ local function fillValues(v, T)
 
   v[T.Squalls] =           { fog = 0.1, clear = 1.0, clouds = 1.0, saturation = 1.2 }
   v[T.Tornado] =           { fog = 0.9, clear = 0.25, clouds = 1, tint = rgb(0.08, 0.14, 0.3) }
-  v[T.Hurricane] =         { fog = 0.8, clear = 0.0, clouds = 1, tint = rgb(0.14, 0.08, 0.3):adjustSaturation(0.5) }
-  v[T.Hail] =              { fog = 0.5, clear = 0.0, clouds = 1, tint = rgb(0.3, 0.08, 0.14):adjustSaturation(0.5) }
+  v[T.Hurricane] =         { fog = 0.8, clear = 0.0, clouds = 1, tint = rgb(0.14, 0.08, 0.3):adjustSaturation(0.5), thunder = 1 }
+  v[T.Hail] =              { fog = 0.5, clear = 0.0, clouds = 1, tint = rgb(0.3, 0.08, 0.14):adjustSaturation(0.5), thunder = 1 }
 
   for k, v in pairs(v) do
     v.fog = v.fog or 0
@@ -78,6 +79,7 @@ local function fillValues(v, T)
     v.tint = v.tint or rgb(1, 1, 1)
     v.fogTint = v.fogTint or rgb(1, 1, 1)
     v.saturation = v.saturation or 1
+    v.thunder = v.thunder or 0
     v.wet = v.wet or 0
   end
 end
@@ -99,8 +101,8 @@ end
 local function lerpConditions(conditions, lagMult, key)
   local vc = values[conditions.currentType]
   local vu = values[conditions.upcomingType]
-  if not vc then ac.debug('Unknown type', conditions.currentType) end
-  if not vu then ac.debug('Unknown type', conditions.upcomingType) end
+  if not vc then ac.debug('Unknown type', conditions.currentType) return end
+  if not vu then ac.debug('Unknown type', conditions.upcomingType) return end
   local ov = CurrentConditions[key]
   CurrentConditions[key] = ov + (math.lerp(vc[key], vu[key], conditions.transition) - ov) * lagMult
 end
@@ -115,8 +117,8 @@ end
 local function lerpConditionsRGB(conditions, lagMult, key, dt)
   local vc = values[conditions.currentType]
   local vu = values[conditions.upcomingType]
-  if not vc then ac.debug('Unknown type', conditions.currentType) end
-  if not vu then ac.debug('Unknown type', conditions.upcomingType) end
+  if not vc then ac.debug('Unknown type', conditions.currentType) return end
+  if not vu then ac.debug('Unknown type', conditions.upcomingType) return end
   
   local a = vc[key] 
   local b = vu[key]
@@ -142,6 +144,7 @@ function ReadConditions(dt)
   lerpConditions(conditions, lagMult, 'cloudsDensity')
   lerpConditionsRGB(conditions, lagMult, 'tint', dt)
   lerpConditions(conditions, lagMult, 'saturation')
+  lerpConditions(conditions, lagMult, 'thunder')
 
   CurrentConditions.wet = conditions.rainWetness
   CurrentConditions.rain = conditions.rainIntensity

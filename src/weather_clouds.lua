@@ -16,6 +16,7 @@ require 'src/weather_clouds_pertrack'
 require 'src/weather_clouds_types'
 
 -- Creates a new cloud and sets it using `fn`, which would be one of `CloudTypes` functions
+---@return ac.SkyCloudV2
 local function createCloud(fn, arg1, arg2)
   local cloud = ac.SkyCloudV2()
   cloud.color = rgb(1, 1, 1)
@@ -105,7 +106,7 @@ function CloudsCell:initialize()
     local cloud = createCloud(hovering 
       and (math.random() > 0.3 and CloudTypes.Spread or CloudTypes.Hovering) 
       or CloudTypes.Dynamic, pos)
-    local weatherThreshold = cloudNoise:get(pos) * 0.95
+    local weatherThreshold = cloudNoise:get(pos) * (hovering and 0.4 or 0.95)
     self:addCloud({
       cloud = cloud,
       pos = pos,
@@ -454,10 +455,25 @@ function UpdateClouds(dt)
   -- testCloud.procShapeShifting = testCloud.procShapeShifting + dt * 0.1
 
   nightEarlyK = math.smoothstep(math.lerpInvSat(SunDir.y, 0.3, -0.05))
-  nightEarlySmoothK = nightEarlySmoothK == -1 and nightEarlyK or math.applyLag(nightEarlySmoothK, nightEarlyK, 0.99, ac.getSimState().dt)
+  nightEarlySmoothK = nightEarlySmoothK == -1 and nightEarlyK or math.applyLag(nightEarlySmoothK, nightEarlyK, 0.99, ac.getSim().dt)
 
   updateCloudCells(dt)
   updateStaticClouds(dt)
   ac.sortClouds()
   ac.invalidateCloudMaps()
+
+  -- ac.debug('occlusion1', ac.getCloudsShadow())
+  -- ac.debug('occlusion2', ac.getCloudCoversShadow())
 end
+
+-- local dome = ac.SkyCloudsCover()
+-- dome.colorMultiplier = rgb(3, 3, 3):scale(0.1)
+-- dome.opacityMultiplier = 1
+-- dome.shadowOpacityMultiplier = 0
+-- dome.ignoreTextureAlpha = true
+-- dome:setFogParams(1, 3)
+-- dome:setTexture(__dirname..'/../_0/cloudy_day_4k.dds')
+-- dome:setMaskTexture(__dirname..'/../_0/mask.dds')
+-- dome.maskOpacityMultiplier = 0
+-- ac.weatherCloudsCovers:push(dome)
+

@@ -14,7 +14,12 @@ require 'src/conditions_converter'  -- thing to turn conditions (esp. weather ty
 require 'src/weather_application'   -- most of weather stuff happens here
 require 'src/light_pollution'       -- adds a sky gradient for light pollution and a few global variables like light pollution intensity
 require 'src/weather_clouds'        -- clouds operating in chunks
--- require 'src/tests'              -- some dev tests
+require 'src/audio'                 -- audio
+require 'src/render'                -- render core
+require 'src/render_aurora'         -- extra effect: aurora
+require 'src/render_rain'           -- extra effect: rain haze
+require 'src/render_fog'            -- extra effect: fog covering tops of high buildings in foggy conditions
+-- require 'src/tests'                 -- some dev tests
 
 -- Use asyncronous textures loading for faster loading
 ac.setAsyncTextureLoading(true)
@@ -41,7 +46,11 @@ ac.setSkyMoonGradient(0)
 
 -- Sun, moon and the planets look too tiny without an extra size boost. If you’re changing it, don’t forget to readjust stuff 
 -- related to eclipses in `weather_application.lua`
-ac.setSkySunMoonSizeMultiplier(2)
+-- ac.setSkySunMoonSizeMultiplier(2)
+
+-- UPD: Have to use original size for moon eclipse to look properly:
+ac.setSkySunMoonSizeMultiplier(1)
+ac.setMoonEclipse(true)
 
 -- Use cloud shadow maps: in this mode, mirrors and reflections will use “ac.getCloudsShadow()” as light multiplier automatically
 ac.setCloudShadowMaps(true)
@@ -85,6 +94,8 @@ local function rareUpdate2(dt)
   ApplyHeatFactor()
   UpdateLightPollution()
   UpdateCloudMaterials()
+  UpdateAurora(dt)
+  UpdateAboveFog(dt)
 end
 
 local lastSunDir = vec3()
@@ -98,17 +109,20 @@ local function getCloudsDeltaT(dt, gameDT)
   local gameTime = ac.getCurrentTime()
   local cloudsDeltaTime = gameTime - lastGameTime
   lastGameTime = gameTime
-  local cloudsDeltaTimeAdj = math.sign(cloudsDeltaTime) * math.abs(cloudsDeltaTime) / (1 + math.abs(cloudsDeltaTime))
-  return math.lerp(math.clamp(cloudsDeltaTimeAdj, -100, 100), gameDT, CloudFixedSpeed)
+  local ratio = math.clamp(math.abs(cloudsDeltaTime) / dt - 150, 1, 200)
+  return dt * math.sign(cloudsDeltaTime) * math.lerp(1, ratio, 0.3)
 end
 
 function script.update(dt)
-  -- This value is time passed in seconds (as dt), but taking into account pause, slow 
+  -- This value is time passed in seconds (as dt), but taking into account pause, slow
   -- motion or fast forward, but not time scale in conditions
   local gameDT = ac.getGameDeltaT()
 
   -- Clouds operate on actual passed time
   local cloudsDT = TimelapsyCloudSpeed and getCloudsDeltaT(dt, gameDT) or gameDT
+
+  ac.debug('gameDT', gameDT)
+  ac.debug('cloudsDT', cloudsDT)
 
   -- If sun moved too much, have to force update
   local currentSunDir = ac.getSunDirection()
@@ -122,7 +136,7 @@ function script.update(dt)
 
   -- Actual update will happen only once in three frames, or if forceUpdate is true
   ruBase:update(gameDT, forceUpdate)
-  ruCloudMaterials:update(gameDT, forceUpdate)
+  ruCloudMaterials:update(cloudsDT, forceUpdate)
 
   -- Increasing refresh rate for faster moving clouds
   if math.abs(cloudsDT) > 0.5 then 
@@ -138,6 +152,15 @@ function script.update(dt)
   -- Fake exposure aka eye adaptation needs to update each frame, with speed independant 
   -- from pause, slow motion and what not
   ApplyFakeExposure(dt)
+
+  -- Thunder effect: a small extra gradient glowing in sky
+  ApplyThunder(dt)
+
+  -- Rain haze: some sort of volumetric-like effect for distant rain
+  UpdateRainHaze(dt)
+
+  -- Update audio (for now, just rain)
+  ApplyAudio(dt)
 
   -- Uncomment to check how much garbage is generated each frame (slows things down)
   -- RunGC()
