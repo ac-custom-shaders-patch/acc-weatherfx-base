@@ -114,7 +114,7 @@ local function getCloudsDeltaT(dt, gameDT)
   local cloudsDeltaTime = gameTime - lastGameTime
   lastGameTime = gameTime
   local ratio = math.clamp(math.abs(cloudsDeltaTime) / dt - 150, 1, 200)
-  return dt * math.sign(cloudsDeltaTime) * math.lerp(1, ratio, 0.3)
+  return dt * math.sign(cloudsDeltaTime) * math.lerp(1, ratio, 0.4)
 end
 
 function script.update(dt)

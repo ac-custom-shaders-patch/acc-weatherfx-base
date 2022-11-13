@@ -45,7 +45,7 @@ local function transitionHeadingAngle(current, target, dt)
   elseif delta < -180 then
     delta = 360 + delta
   end
-  return current + (target - current) * math.min(dt, 0.1) * math.lerpInvSat(windSpeed, 0.002, 0.009)
+  return current + delta * math.min(dt, 0.1) * math.lerpInvSat(windSpeed, 0.002, 0.009) * 0.02
 end
 
 local nightEarlyK = 0
