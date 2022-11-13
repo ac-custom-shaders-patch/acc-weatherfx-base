@@ -10,10 +10,10 @@ TimelapsyCloudSpeed = true -- change to false to stop clouds from moving all fas
 SmoothTransition = true -- smooth transition between weather types (even if change was sudden)
 BlurShadowsWhenSunIsLow = false -- reduce shadows resolution for when sun is low
 BlurShadowsWithFog = true -- reduce shadows resolution with thick fog
+UseLambertGammaFix = true -- fixes darker surfaces when sun is low
 
 SunIntensity = 12 -- how bright sun is in general
-SunMieIntensity = 3 -- brightness of glow around sun on the sky 
-SunLightIntensity = 1 -- brightness of sun light cast on the scene
+SunLightIntensity = UseLambertGammaFix and 0.7 or 1 -- brightness of sun light cast on the scene
 AmbientLightIntensity = 10 -- brightness of ambient light on the scene
 FogBacklitIntensity = 2 -- brightness of fog backlit
 MoonLightMult = 0.5 -- how bright is moon light

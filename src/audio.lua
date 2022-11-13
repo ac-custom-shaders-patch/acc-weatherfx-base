@@ -51,7 +51,7 @@ local carAudioPlaying = false
 local grassPos = vec3()
 local gravelPos = vec3()
 
----@return ac.StateCar
+---@return ac.StateCar?
 local function nearestCar()
   if sim.focusedCar == -1 then return nil end
   local car = ac.getCar(sim.focusedCar)

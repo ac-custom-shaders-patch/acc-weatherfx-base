@@ -44,7 +44,7 @@ local function fillValues(v, T)
   v[T.Cold] =              { fog = 0.3, clear = 0.9, clouds = 0.4, saturation = 0.5, tint = rgb(0.8, 0.9, 1.0) }
   v[T.Hot] =               { fog = 0.1, clear = 1.0, clouds = 0.1, saturation = 1.2, tint = rgb(1.0, 0.9, 0.8) }
   v[T.Fog] =               { fog = 1.0, clear = 0.1, clouds = 0.0 }
-  v[T.Mist] =              { fog = 0.6, clear = 0.6, clouds = 0.2, tint = rgb(0.8, 0.9, 1.0) }
+  v[T.Mist] =              { fog = 0.4, clear = 0.6, clouds = 0.2, tint = rgb(0.8, 0.9, 1.0) }
   v[T.Haze] =              { fog = 0.3, clear = 0.5, clouds = 0.2, tint = rgb(1, 0.92, 0.9), saturation = 0.8 }
   v[T.Dust] =              { fog = 0.5, clear = 0.9, clouds = 0.2, tint = rgb(1, 0.85, 0.8), saturation = 0.8 }
   v[T.Smoke] =             { fog = 0.7, clear = 0.9, clouds = 0.8, tint = rgb(0.8, 0.8, 1):scale(0.15), saturation = 0.4 }
@@ -145,6 +145,10 @@ function ReadConditions(dt)
   lerpConditionsRGB(conditions, lagMult, 'tint', dt)
   lerpConditions(conditions, lagMult, 'saturation')
   lerpConditions(conditions, lagMult, 'thunder')
+
+  -- ac.debug('altitude', ac.getAltitude())
+  -- ac.debug('camera', ac.getCameraPosition().y)
+  -- CurrentConditions.fog = math.lerp(CurrentConditions.fog, 1, math.max(0, 1 - math.abs(ac.getCameraPosition().y - 600) / 200))
 
   CurrentConditions.wet = conditions.rainWetness
   CurrentConditions.rain = conditions.rainIntensity

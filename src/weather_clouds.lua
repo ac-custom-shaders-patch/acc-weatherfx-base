@@ -45,7 +45,7 @@ local function transitionHeadingAngle(current, target, dt)
   elseif delta < -180 then
     delta = 360 + delta
   end
-  return current + (target - current) * math.min(dt, 0.1) * math.lerpInvSat(windSpeed, 5, 100) * 0.1
+  return current + (target - current) * math.min(dt, 0.1) * math.lerpInvSat(windSpeed, 0.002, 0.009)
 end
 
 local nightEarlyK = 0
@@ -207,6 +207,7 @@ function CloudsCell:updateDynamic(cameraPos, cellDistance, dt)
       weatherCutoff = 1 - math.lerpInvSat(ccClouds, e.weatherThreshold0, e.weatherThreshold1)
       c.cutoff = math.max(math.saturateN(nearbyCutoff), weatherCutoff)
       c.position.y = math.lerp(DynCloudsDistantHeight + c.size.y * 0.4, c.position.y + c.size.y * 0.8, distanceK)
+      -- c.position.y = 1000 - ac.getCameraPosition().y
     end
 
     if c.cutoff < 0.999 and c.opacity > 0.001 then
@@ -450,9 +451,7 @@ end
 function UpdateClouds(dt)
   windDir = CurrentConditions.windDir
   windSpeed = CurrentConditions.windSpeed * 4 -- clouds move faster up there
-  windAngle = math.atan2(windDir.y, -windDir.x) * 180 / math.pi + math.random() * 20 - 10
-
-  -- testCloud.procShapeShifting = testCloud.procShapeShifting + dt * 0.1
+  windAngle = math.atan2(windDir.y, -windDir.x) * 180 / math.pi
 
   nightEarlyK = math.smoothstep(math.lerpInvSat(SunDir.y, 0.3, -0.05))
   nightEarlySmoothK = nightEarlySmoothK == -1 and nightEarlyK or math.applyLag(nightEarlySmoothK, nightEarlyK, 0.99, ac.getSim().dt)
@@ -461,19 +460,15 @@ function UpdateClouds(dt)
   updateStaticClouds(dt)
   ac.sortClouds()
   ac.invalidateCloudMaps()
-
-  -- ac.debug('occlusion1', ac.getCloudsShadow())
-  -- ac.debug('occlusion2', ac.getCloudCoversShadow())
 end
 
 -- local dome = ac.SkyCloudsCover()
 -- dome.colorMultiplier = rgb(3, 3, 3):scale(0.1)
--- dome.opacityMultiplier = 1
+-- dome.opacityMultiplier = 0.5
 -- dome.shadowOpacityMultiplier = 0
--- dome.ignoreTextureAlpha = true
+-- dome.ignoreTextureAlpha = false
 -- dome:setFogParams(1, 3)
 -- dome:setTexture(__dirname..'/../_0/cloudy_day_4k.dds')
 -- dome:setMaskTexture(__dirname..'/../_0/mask.dds')
--- dome.maskOpacityMultiplier = 0
+-- dome.maskOpacityMultiplier = 0.5
 -- ac.weatherCloudsCovers:push(dome)
-

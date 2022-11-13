@@ -85,7 +85,7 @@ function ApplySky()
   ac.setSkyV2MieDirectionalG(ac.SkyRegion.All, 0.8)
   ac.setSkyV2RefractiveIndex(ac.SkyRegion.All, 1.0003)
   ac.setSkyV2DepolarizationFactor(ac.SkyRegion.All, 0.035)
-  ac.setSkyV2MieV(ac.SkyRegion.All, 4.0)
+  ac.setSkyV2MieV(ac.SkyRegion.All, 3.95)
   ac.setSkyV2RayleighZenithLength(ac.SkyRegion.All, 8400)
   ac.setSkyV2MieZenithLength(ac.SkyRegion.All, 1.25e3)
   ac.setSkyV2SunIntensityFactor(ac.SkyRegion.All, 1000.0)
@@ -213,13 +213,18 @@ end
 -- Updates ambient lighting based on sky color without taking sun or moon into account
 local ambientBaseColor = rgb(1, 1, 1)
 local ambientAdjColor = rgb(1, 1, 1)
+local ambientDistantColor = rgb()
 local ambientExtraColor = rgb()
+local ambientExtraDirection = vec3()
 function ApplyAmbient()
   -- Base ambient color: uses sky color at zenith with extra addition of light pollution, adjusted for conditions
   ambientBaseColor
     :set(LightPollutionExtraAmbient)
     :add(skyTopColor)
     :adjustSaturation(CurrentConditions.saturation)
+
+  local rain = math.min(CurrentConditions.rain * 2, 1)
+  ambientBaseColor.r = ambientBaseColor.r * math.lerp(1, 0.8, rain)
 
   -- Actual scene ambient color
   ambientAdjColor:set(ambientBaseColor)
@@ -230,8 +235,7 @@ function ApplyAmbient()
   ambientAdjColor:scale(AmbientLightIntensity):adjustSaturation(math.lerp(0.25, 0.5, horizonK))
   ac.setAmbientColor(ambientAdjColor)
 
-  -- ac.debug('LightPollutionExtraAmbient', LightPollutionExtraAmbient)
-  -- ac.debug('ambientBaseColor', ambientBaseColor)
+  ac.setDistantAmbientColor(ambientDistantColor:set(0.7 - rain * 0.2, 1, 1.3):mul(ambientAdjColor), 4000)
 
   -- Extra ambient for sunsets, to take into account sky glow even when sun is below horizon
   local extraAmbientMult = sunsetK * (1 - NightK) * math.lerpInvSat(CurrentConditions.clear, 0.3, 1)
@@ -242,7 +246,7 @@ function ApplyAmbient()
       :mul(rgb.tmp():set(CurrentConditions.tint):add(1):scale(0.5))
       :scale((1 + CurrentConditions.clouds * 0.6) * extraAmbientMult * 2)
     ac.setExtraAmbientColor(ambientExtraColor)
-    ac.setExtraAmbientDirection(vec3(SunDir.x, math.max(SunDir.y, 0.1), SunDir.z))
+    ac.setExtraAmbientDirection(ambientExtraDirection:set(SunDir.x, math.max(SunDir.y, 0.1), SunDir.z))
   else
     local directedAmbient = math.lerpInvSat(CurrentConditions.clear, 0.3, 0) * math.lerp(0.3, 0.6, CurrentConditions.cloudsDensity) 
       * (1 - NightK) * (1 - CurrentConditions.fog)
@@ -251,7 +255,7 @@ function ApplyAmbient()
       ac.setAmbientColor(ambientExtraColor)
       ambientExtraColor:set(ambientAdjColor):scale(directedAmbient)
       ac.setExtraAmbientColor(ambientExtraColor)
-      ac.setExtraAmbientDirection(SunDir + vec3(0, 0.3 / (0.1 + directedAmbient), 0))
+      ac.setExtraAmbientDirection(ambientExtraDirection:set(0, 0.3 / (0.1 + directedAmbient), 0):add(SunDir))
     else
       ambientExtraColor:set(0)
       ac.setExtraAmbientColor(ambientExtraColor)
@@ -281,9 +285,9 @@ function ApplyFog(dt)
   ac.setFogColor(skyHorizonColor:scale(SkyBrightness))
 
   local ccFog = CurrentConditions.fog
-  local fogDistance = math.lerp(800, 35, ccFog)
+  local fogDistance = math.lerp(1500, 35, ccFog)
   local fogHorizon = math.min(1, math.lerp(0.5, 1.1, ccFog ^ 0.5))
-  local fogDensity = math.lerp(0.1, 1, ccFog)
+  local fogDensity = math.lerp(0.03, 1, ccFog ^ 2)
   local fogExponent = math.lerp(0.3, 0.5, fogNoise:get(cameraPos))
 
   local groundY = ac.getGroundYApproximation()
@@ -317,6 +321,7 @@ function ApplyHeatFactor()
 end
 
 -- Updates stuff like moon, stars and planets
+local moonBaseColor = rgb()
 function ApplySkyFeatures()
   -- local brightness = ((0.25 / math.max(lightBrightness, 0.05)) ^ 2) * LightPollutionSkyFeaturesMult 
   --   * (CurrentConditions.clear ^ 4) * 0.1
@@ -325,7 +330,7 @@ function ApplySkyFeatures()
   local moonOpacity = math.lerp(0.1, 1, NightK) * CurrentConditions.clear * LightPollutionSkyFeaturesMult
 
   ac.setSkyMoonMieMultiplier(0.05 * (1 - CurrentConditions.clear))
-  ac.setSkyMoonBaseColor(MoonColor * (0.2 + NightK))
+  ac.setSkyMoonBaseColor(moonBaseColor:setScaled(MoonColor, 0.2 + NightK))
   ac.setSkyMoonBrightness(moonBrightness)
   ac.setSkyMoonOpacity(moonOpacity)
   ac.setSkyMoonMieExp(120)
@@ -445,15 +450,15 @@ function ApplyFakeExposure(dt)
     ac.setBrightnessMult(sceneBrightness * SceneBrightnessMultNoPP)
     ac.setOverallSkyBrightnessMult(SkyBrightness)
   end
-
   -- ac.debug('lightsMult', lightsMult)
 
   ac.setWeatherLightsMultiplier(math.max(lightsMult * 1.25 - 0.25, 0) * 2) -- how bright are lights
+  ac.setTrueEmissiveMultiplier(lightsMult) -- how bright are extrafx emissives
   ac.setGlowBrightness(lightsMult * 0.14) -- how bright are those distant emissive glows
   ac.setEmissiveMultiplier(0.9 + lightsMult * 0.3) -- how bright are emissives
   ac.setWeatherTrackLightsMultiplierThreshold(0.01) -- let make lights switch on early for smoothness
 
-  ac.setBaseAmbientColor(vec3.tmp():set(0.04 * lightsMult)) -- base ambient adds a bit of extra ambient lighting not
+  ac.setBaseAmbientColor(rgb.tmp():set(0.04 * lightsMult)) -- base ambient adds a bit of extra ambient lighting not
     -- affected by ambient occlusion, so even pitch black tunnels become a tiny bit lit after “eye” adapts.
 
   ac.setReflectionEmissiveBoost(1 + 2 * NightK)

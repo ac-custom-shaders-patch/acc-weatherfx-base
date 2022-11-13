@@ -138,7 +138,7 @@ local function renderAurora(passID, frameIndex, uniqueKey)
 end
 
 local auroraGlow ---@type ac.SkyExtraGradient
-local subscribed ---@type fun()
+local subscribed ---@type fun()?
 
 local function setAuroraActive(active)
   if active ~= (subscribed ~= nil) then
@@ -160,8 +160,22 @@ local function setAuroraActive(active)
   end
 end
 
--- TODO: Move to a remote list
-local solarStorms = { '0310', '0909', '2105', '3801', '4003', '4109', '4603', '5602', '5709', '5802', '5907', '6705', '6810', '7208', '8903', '8908', '9111', '0004', '0007', '0104', '0111', '0310', '0311', '0501', '1709', '2202' }
+local solarStorms = stringify.tryParse(ac.storage.solarStorms, nil, { '0501', '1709', '2202' })
+local currentTime = os.time()
+
+-- Updating list of auroras every three days
+if not ac.storage.solarStormsTime or currentTime > tonumber(ac.storage.solarStormsTime) + 3 * 24 * 60 * 60 then
+  web.get('https://acstuff.ru/j/auroras.txt', function (err, response)
+    if err then return end
+    local newList = table.filter(response.body:split('\n'), function (s) return #s == 4 end)
+    if #newList > 4 then
+      solarStorms = newList
+      ac.storage.solarStorms = stringify(newList)
+      ac.storage.solarStormsTime = currentTime
+    end
+  end)
+end
+
 local sim = ac.getSim()
 local lattitude = math.abs(ac.getTrackCoordinatesDeg().x)
 
@@ -191,8 +205,15 @@ local function computeAuroraIntensity(chance)
   return ret
 end
 
+local prevHour, chance
+
 function UpdateAurora(dt)
-  local chance = computeAuroraChance()
+  local curHour = math.floor(sim.timestamp / (60 * 60))
+  if curHour ~= prevHour then
+    chance = computeAuroraChance()
+    prevHour = curHour
+  end
+
   if chance == 0 then
     if subscribed then setAuroraActive(false) end
     return

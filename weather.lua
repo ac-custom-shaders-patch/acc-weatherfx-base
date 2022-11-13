@@ -19,6 +19,7 @@ require 'src/render'                -- render core
 require 'src/render_aurora'         -- extra effect: aurora
 require 'src/render_rain'           -- extra effect: rain haze
 require 'src/render_fog'            -- extra effect: fog covering tops of high buildings in foggy conditions
+-- require 'src/render_test'           -- extra effect: testing a shader for a billboard on track
 -- require 'src/tests'                 -- some dev tests
 
 -- Use asyncronous textures loading for faster loading
@@ -78,6 +79,9 @@ ac.fixSkyColorCalculateOrder(true)
 ac.fixSkyV2Fog(true)
 ac.fixCloudsV2Fog(true)
 
+-- A tweak for lambert diffuse model making lighting of regular materials more correct and PBR-like
+ac.setLambertGamma(UseLambertGammaFix and 1 / 2.2 or 1)
+
 -- Called each 3rd frame or if sun moved
 local function rareUpdate1(dt)
   ReadConditions(dt)
@@ -121,9 +125,6 @@ function script.update(dt)
   -- Clouds operate on actual passed time
   local cloudsDT = TimelapsyCloudSpeed and getCloudsDeltaT(dt, gameDT) or gameDT
 
-  ac.debug('gameDT', gameDT)
-  ac.debug('cloudsDT', cloudsDT)
-
   -- If sun moved too much, have to force update
   local currentSunDir = ac.getSunDirection()
   local currentCameraPos = ac.getCameraPosition()
@@ -154,10 +155,10 @@ function script.update(dt)
   ApplyFakeExposure(dt)
 
   -- Thunder effect: a small extra gradient glowing in sky
-  ApplyThunder(dt)
+  ApplyThunder(gameDT)
 
   -- Rain haze: some sort of volumetric-like effect for distant rain
-  UpdateRainHaze(dt)
+  UpdateRainHaze(gameDT)
 
   -- Update audio (for now, just rain)
   ApplyAudio(dt)

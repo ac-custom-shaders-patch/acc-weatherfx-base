@@ -66,7 +66,7 @@ local function renderHaze(passID, frameIndex, uniqueKey)
   })
 end
 
-local subscribed ---@type fun()
+local subscribed ---@type fun()?
 
 function UpdateRainHaze(dt)
   local cc = CurrentConditions
