@@ -1,5 +1,5 @@
 float main(PS_IN pin) {
-  float depthValue = txDepth.SampleLevel(samLinearSimple, pin.Tex, 0);
+  float depthValue = pin.GetDepth();
   float linearDepth = linearizeDepth(depthValue);
   if (depthValue == 1 || linearDepth < 10 || linearDepth > 2e3) return 0;
 

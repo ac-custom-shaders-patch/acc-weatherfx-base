@@ -18,18 +18,21 @@
 ]]
 
 local intensity = 0
+local renderFogParams = {
+  blendMode = render.BlendMode.AlphaBlend,
+  depthMode = render.DepthMode.ReadOnly,
+  depth = 40,  -- fullscreen pass applies to areas further than 40 meters from camera, to improve performance
+  shader = 'shaders/fog.fx',
+  values = {
+    gIntensity = intensity
+  },
+  async = true,
+  cacheKey = 1
+}
 
 local function renderFog()
-  render.fullscreenPass({
-    blendMode = render.BlendMode.AlphaBlend,
-    depthMode = render.DepthMode.ReadOnly,
-    depth = 40,  -- fullscreen pass applies to areas further than 40 meters from camera, to improve performance
-    shader = 'shaders/fog.fx',
-    values = {
-      gIntensity = intensity
-    },
-    async = true
-  })
+  renderFogParams.values.gIntensity = intensity
+  render.fullscreenPass(renderFogParams)
 end
 
 local subscribed ---@type fun()

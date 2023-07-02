@@ -52,7 +52,7 @@ local function updateSkySubscription()
     local e = renderTrackListeners[i]
     mTrack = bit.bor(mTrack, e.passIDMask)
   end
-  ac.enableRenderCallback(mSky, mClouds, mTrack)
+  ac.enableRenderCallback(mSky, mClouds, mTrack, 0)
 end
 
 ---@param passIDMask render.PassID

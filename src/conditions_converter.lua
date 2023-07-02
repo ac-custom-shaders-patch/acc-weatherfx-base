@@ -13,6 +13,8 @@ CurrentConditions = {
   windDir = vec2(0, 1), -- normalized wind direction (for clouds)
   windSpeed = 5, -- wind speed in m/s (for clouds)
   rain = 0,
+  wetness = 0,
+  water = 0,
   thunder = 0
 }
 
@@ -80,7 +82,6 @@ local function fillValues(v, T)
     v.fogTint = v.fogTint or rgb(1, 1, 1)
     v.saturation = v.saturation or 1
     v.thunder = v.thunder or 0
-    v.wet = v.wet or 0
   end
 end
 
@@ -150,7 +151,8 @@ function ReadConditions(dt)
   -- ac.debug('camera', ac.getCameraPosition().y)
   -- CurrentConditions.fog = math.lerp(CurrentConditions.fog, 1, math.max(0, 1 - math.abs(ac.getCameraPosition().y - 600) / 200))
 
-  CurrentConditions.wet = conditions.rainWetness
   CurrentConditions.rain = conditions.rainIntensity
+  CurrentConditions.wetness = conditions.rainWetness
+  CurrentConditions.water = conditions.rainWater
   counter = counter + 1
 end

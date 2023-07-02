@@ -223,7 +223,7 @@ function ApplyAmbient()
     :add(skyTopColor)
     :adjustSaturation(CurrentConditions.saturation)
 
-  local rain = math.min(CurrentConditions.rain * 2, 1)
+  local rain = math.min(CurrentConditions.wetness * 50, 1)
   ambientBaseColor.r = ambientBaseColor.r * math.lerp(1, 0.8, rain)
 
   -- Actual scene ambient color
@@ -313,9 +313,9 @@ end
 
 -- Calculates heat factor for wobbling air above heated track and that wet road/mirage effect
 function ApplyHeatFactor()
-  local heatFactor = math.lerpInvSat(SunDir.y, 0.7, 0.8) 
-    * math.lerpInvSat(CurrentConditions.clear, 0.8, 1) 
-    * math.lerpInvSat(CurrentConditions.clouds, 0.5, 0.2)
+  local heatFactor = math.lerpInvSat(SunDir.y, 0.6, 0.7) 
+    * math.lerpInvSat(CurrentConditions.clear, 0.7, 0.9) 
+    * math.lerpInvSat(CurrentConditions.clouds, 0.6, 0.3)
     * math.lerpInvSat(CurrentConditions.windSpeed, 7, 3)
   ac.setTrackHeatFactor(heatFactor)
 end
@@ -461,6 +461,8 @@ function ApplyFakeExposure(dt)
   ac.setBaseAmbientColor(rgb.tmp():set(0.04 * lightsMult)) -- base ambient adds a bit of extra ambient lighting not
     -- affected by ambient occlusion, so even pitch black tunnels become a tiny bit lit after “eye” adapts.
 
+  -- Trying to get reflections to work better
+  ac.setFresnelGamma(math.lerp(1, 0.8, NightK))
   ac.setReflectionEmissiveBoost(1 + 2 * NightK)
 end
 

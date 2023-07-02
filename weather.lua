@@ -8,6 +8,11 @@
 -- to fork this script and make your own version of it, of course, feel free to use a more readable approach.
 --------
 
+if ac.getSim().isShowroomMode or ac.getSim().isPreviewsGenerationMode then
+  require 'src/showroom_mode'
+  return
+end
+
 require 'src/consts'                -- some general constant values
 require 'src/utils'                 -- helpful functions
 require 'src/conditions_converter'  -- thing to turn conditions (esp. weather type) info something usable: a few easy to use numbers
@@ -117,6 +122,8 @@ local function getCloudsDeltaT(dt, gameDT)
   return dt * math.sign(cloudsDeltaTime) * math.lerp(1, ratio, 0.4)
 end
 
+-- local gif = ui.GIFPlayer('1.gif')
+
 function script.update(dt)
   -- This value is time passed in seconds (as dt), but taking into account pause, slow
   -- motion or fast forward, but not time scale in conditions
@@ -160,9 +167,6 @@ function script.update(dt)
   -- Rain haze: some sort of volumetric-like effect for distant rain
   UpdateRainHaze(gameDT)
 
-  -- Update audio (for now, just rain)
-  ApplyAudio(dt)
-
   -- Uncomment to check how much garbage is generated each frame (slows things down)
   -- RunGC()
 
@@ -170,4 +174,34 @@ function script.update(dt)
   -- RunDevTests()
 
   -- ac.setShadowsResolution(2048)
+
+  -- For testing replays
+  -- ac.debug('car.isRaceFinished', ac.getCar(0).isRaceFinished)
+  -- ac.debug('sim.raceSessionType', ac.getSim().raceSessionType)
+  -- ac.debug('sim.currentSessionIndex', ac.getSim().currentSessionIndex)
+  -- ac.debug('getSession(0).type', ac.getSession(0).type)
+  -- ac.debug('getSession(0).laps', ac.getSession(0).laps)
+  -- ac.debug('getSession(0).isOver', ac.getSession(0).isOver)
+
+  -- ac.setPpTonemapFunction({
+  --   textures = {
+  --     txNoiseLr = 'rain_fx/puddles.dds',
+  --     txGif = gif
+  --   },
+  --   values = {
+  --     gTime = os.preciseClock()
+  --   },
+  --   defines = {
+  --     -- __CSP_PROVIDE_TEXCOORDS = true
+  --   },
+  --   shader = 'shaders/tonemapping_test.fx',
+  --   cacheKey = 0
+  -- })
+
+  -- ac.debug(mat4x4.euler(1, 2, 3))
+end
+
+function script.frameBegin(dt)
+  -- Update audio (for now, just rain)
+  ApplyAudio(dt)
 end

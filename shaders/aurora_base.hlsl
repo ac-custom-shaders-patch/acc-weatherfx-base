@@ -48,7 +48,7 @@ float temporalSmoothing(Texture2D<float1> txPrevious, float2 tex, float ret){
   float4 newUV = mul(oldPos, gPreviousCameraToTex);
   newUV /= newUV.w;
 
-  float prev = txPrevious.Sample(samLinearBorder0, newUV.xy).x;
+  float prev = txPrevious.Sample(samPointBorder0, newUV.xy).x;
   float2 uvDist = abs(newUV.xy - 0.5);
   float mix = prev == 0 ? 1 : lerp(gTemporalSmoothing, 1, saturate((max(uvDist.x, uvDist.y) - 0.495) * 200) * 0.95);
   return lerp(prev, ret, mix);
