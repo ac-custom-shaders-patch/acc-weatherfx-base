@@ -31,11 +31,11 @@ float tonemap_uchimura(float x) {
   return tonemap_uchimura(x, P, a, m, l, c, b);
 }
 
-float3 main(float3 color){
+float3 main(float3 color, float2 uv){
   float3 ret = float3(tonemap_uchimura(color.x), tonemap_uchimura(color.y), tonemap_uchimura(color.z)).rgb;  
-  float4 tx = txGif.SampleLevel(samLinear, color.xy, 0);
+  float4 tx = txGif.SampleLevel(samLinear, uv, 0);
   // ret = ret * uv.rrg;
   ret += tx.rgb;
   ret += frac(gTime) * 0.1;
-  return ret;
+  return ret.bgr;
 }

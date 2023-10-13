@@ -13,6 +13,11 @@ if ac.getSim().isShowroomMode or ac.getSim().isPreviewsGenerationMode then
   return
 end
 
+ScriptSettings = ac.INIConfig.scriptSettings():mapSection('POSTPROCESSING', {
+  LIGHTWEIGHT_REPLACEMENT = false,
+  FILM_GRAIN = false
+})
+
 require 'src/consts'                -- some general constant values
 require 'src/utils'                 -- helpful functions
 require 'src/conditions_converter'  -- thing to turn conditions (esp. weather type) info something usable: a few easy to use numbers
@@ -25,6 +30,7 @@ require 'src/render_aurora'         -- extra effect: aurora
 require 'src/render_rain'           -- extra effect: rain haze
 require 'src/render_fog'            -- extra effect: fog covering tops of high buildings in foggy conditions
 -- require 'src/render_test'           -- extra effect: testing a shader for a billboard on track
+-- require 'src/render_surface'        -- extra effect: testing a shader for a billboard on track
 -- require 'src/tests'                 -- some dev tests
 
 -- Use asyncronous textures loading for faster loading
@@ -122,7 +128,7 @@ local function getCloudsDeltaT(dt, gameDT)
   return dt * math.sign(cloudsDeltaTime) * math.lerp(1, ratio, 0.4)
 end
 
--- local gif = ui.GIFPlayer('1.gif')
+-- local gif = ui.GIFPlayer('C:/Games/AssettoCorsa/apps/lua/iclicker/1.gif')
 
 function script.update(dt)
   -- This value is time passed in seconds (as dt), but taking into account pause, slow
@@ -185,20 +191,24 @@ function script.update(dt)
 
   -- ac.setPpTonemapFunction({
   --   textures = {
-  --     txNoiseLr = 'rain_fx/puddles.dds',
+  --     -- txNoiseLr = 'rain_fx/puddles.dds',
   --     txGif = gif
   --   },
   --   values = {
-  --     gTime = os.preciseClock()
+  --     gTime = os.preciseClock(),
   --   },
   --   defines = {
-  --     -- __CSP_PROVIDE_TEXCOORDS = true
+  --     __CSP_PROVIDE_TEXCOORDS = true
   --   },
   --   shader = 'shaders/tonemapping_test.fx',
   --   cacheKey = 0
   -- })
 
   -- ac.debug(mat4x4.euler(1, 2, 3))
+end
+
+if ScriptSettings.LIGHTWEIGHT_REPLACEMENT then
+  require 'src/render_postprocessing'
 end
 
 function script.frameBegin(dt)

@@ -109,3 +109,36 @@ end
   posW.xyz += gCameraPosition;  
   return float4(frac(posW.xyz), 0.5);
 ]]
+
+-- local ev, evDataFactory = ac.OnlineEvent({
+--   handL = ac.StructItem.transform(true, true, -1, 1),
+--   handR = ac.StructItem.transform(true, true, -1, 1),
+--   head = ac.StructItem.transform(true, true, -1, 1),
+--   flags = ac.StructItem.byte(),
+--   handStateL = ac.StructItem.byte(),
+--   handStateR = ac.StructItem.byte(),
+-- }, function (sender, message)
+-- --   if not sender or sender.index == 0 then return end
+-- --   local rig = rigs[sender.index]
+-- --   if not rig then
+-- --     rig = VRRig.Remote(sender)
+-- --     rigs[sender.index] = rig
+-- --   end
+-- --   rig:data(message)
+-- end, '$SmallTweaks.ExtraData', {range = 50})
+
+-- local car = ac.getCar(0)
+-- local evData = evDataFactory()
+-- if car then
+--   -- local encoder = VRRig.Encoder(car, vr) ---@type VRRig.Encoder
+--   setInterval(function ()
+--     evData.handL.side.x = 123
+--     evData.flags = 1
+--     ev(nil)
+--     -- if Sim.cameraMode == ac.CameraMode.Cockpit and Sim.focusedCar == 0 then
+--     --   encoder:encode(evData)
+--     --   ac.debug('evData', evData.handL.position)
+--     --   ev(nil)
+--     -- end
+--   end, 0.1)
+-- end

@@ -64,8 +64,6 @@ local function renderAurora(passID, frameIndex, uniqueKey)
   local time = auroraTime
   local uvPadding = 1.6
 
-  render.backupRenderTarget()
-
   tex.txBaseNoise:updateSceneWithShader({
     textures = {
       txNoiseLr = 'rain_fx/puddles.dds',
@@ -126,8 +124,6 @@ local function renderAurora(passID, frameIndex, uniqueKey)
     shader = 'shaders/aurora_blur_high.fx',
     cacheKey = 0
   })
-
-  render.restoreRenderTarget()
 
   render.fullscreenPass({
     blendMode = render.BlendMode.BlendAdd,

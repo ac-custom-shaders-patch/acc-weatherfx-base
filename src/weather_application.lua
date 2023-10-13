@@ -7,6 +7,7 @@
 NightK = 0 -- 1 at nights, 0 during the day
 SunDir = vec3(0, 1, 0)
 MoonDir = vec3(0, 1, 0)
+GodraysColor = rgb()
 
 -- Various local variables, changing with each update, something easy to deal with things. There is 
 -- no need to edit any of those values if you want to change anything, please proceed further to
@@ -134,7 +135,7 @@ end
 -- Updates main scene light: could be either sun or moon light, dims down with eclipses
 local moonAbsorption = rgb()
 local cloudLightColor = rgb()
-local godraysColor = rgb()
+
 function ApplyLight()
   local eclipseLightMult = (1 - eclipseK * 0.8) -- up to 80% general occlusion
     * (1 - eclipseFullK * 0.98) -- up to 98% occlusion for real full eclipse
@@ -183,17 +184,17 @@ function ApplyLight()
   lightColor:scale(math.lerpInvSat(lightDir.y, -0.03, 0) * SunLightIntensity)
 
   -- Dim godrays even more
-  godraysColor:set(lightColor):scale(math.lerpInvSat(lightDir.y, 0.01, 0.02) * (1 - CurrentConditions.fog ^ 2))
+  GodraysColor:set(lightColor):scale(math.lerpInvSat(lightDir.y, 0.01, 0.02) * (1 - CurrentConditions.fog ^ 2))
 
   -- And godrays!
   if SunRaysCustom then
-    ac.setGodraysCustomColor(godraysColor)
+    ac.setGodraysCustomColor(GodraysColor)
     ac.setGodraysCustomDirection(lightDir)
     ac.setGodraysLength(0.3)
     ac.setGodraysGlareRatio(0)
     ac.setGodraysAngleAttenuation(1)
   else
-    ac.setGodraysCustomColor(godraysColor:scale(SunRaysIntensity))
+    ac.setGodraysCustomColor(GodraysColor:scale(SunRaysIntensity))
     ac.setGodraysCustomDirection(lightDir)
   end
 
@@ -262,8 +263,15 @@ function ApplyAmbient()
     end
   end
 
+  -- ac.debug('lightBrightness', lightBrightness)
+  -- ac.debug('horizonK', horizonK)
+  -- ac.debug('headlights', lightBrightness < 8 or horizonK > 0.5)
+  -- ac.debug('sugg', math.max(math.lerpInvSat(lightBrightness, 8, 6), math.lerpInvSat(horizonK, 0.8, 0.9)))
+
   -- Turning on headlights when it’s too dark outside
-  ac.setAiHeadlights(lightBrightness < 8 or horizonK > 0.5)
+  -- ac.setAiHeadlights(lightBrightness < 8 or horizonK > 0.5)
+  ac.setAiHeadlightsSuggestion(math.max(math.lerpInvSat(lightBrightness, 6, 4), 
+    math.max(math.lerpInvSat(horizonK, 0.8, 0.9), math.lerpInvSat(CurrentConditions.rain, 0.003, 0.01))))
 
   -- Adjusting fake shadows under cars
   ac.setWeatherFakeShadowOpacity(1)
@@ -278,7 +286,7 @@ end
 local cameraPos = vec3(0, 0, 0)
 local cameraPosPrev = vec3(0, 0, 0)
 local skyHorizonColor = rgb(1, 1, 1)
-local groundYAveraged = math.NaN 
+local groundYAveraged = math.nan 
 local fogNoise = LowFrequency2DNoise:new{ frequency = 0.003 }
 function ApplyFog(dt)
   ac.calculateSkyColorTo(skyHorizonColor, vec3(SunDir.z, 0, -SunDir.x), false, false)

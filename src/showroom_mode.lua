@@ -99,6 +99,7 @@ local weather = ac.connect({
   toneExposure = ac.StructItem.float(),
   toneGamma = ac.StructItem.float(),
   whiteReferencePoint = ac.StructItem.float(),
+  saturation = ac.StructItem.float(),
   fakeReflection = ac.StructItem.boolean(),
   reflectionBrightness = ac.StructItem.float(),
   reflectionSaturation = ac.StructItem.float(),
@@ -121,6 +122,7 @@ local function syncOverride()
   ac.setShadows(weather.disableShadows and ac.ShadowsState.Off or ac.ShadowsState.On)
   ac.setReflectionsBrightness(weather.reflectionBrightness)
   ac.setReflectionsSaturation(weather.reflectionSaturation)
+  ac.setPpSaturation(weather.saturation)
   if weather.customToneParams then
     if weather.toneFunction ~= -1 then ac.setPpTonemapFunction(weather.toneFunction) end
     if weather.toneExposure ~= 0 then ac.setPpTonemapExposure(weather.toneExposure) end

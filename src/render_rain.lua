@@ -58,17 +58,19 @@ local renderHazeApplyParams = {
 }
 
 local function renderHaze(passID, frameIndex, uniqueKey)
-  local tex = table.getOrCreate(texData, uniqueKey, createPassData, uniqueKey)
-
-  render.backupRenderTarget()
-  renderHazeNoiseParams.values.gIntensity = intensity
-  renderHazeNoiseParams.values.gDistanceInv = 1 / math.lerp(120, 60, math.min(intensity, 1))
-  tex.txBaseNoise:updateSceneWithShader(renderHazeNoiseParams)
-  render.restoreRenderTarget()
-
-  renderHazeApplyParams.textures['txBase.1'] = tex.txBaseNoise
-  renderHazeApplyParams.values.gBlurRadius = tex.gBlurRadius
-  render.fullscreenPass(renderHazeApplyParams)
+  render.measure('Rain haze', function ()
+    local tex = table.getOrCreate(texData, uniqueKey, createPassData, uniqueKey)
+  
+    render.backupRenderTarget()
+    renderHazeNoiseParams.values.gIntensity = intensity
+    renderHazeNoiseParams.values.gDistanceInv = 1 / math.lerp(120, 60, math.min(intensity, 1))
+    tex.txBaseNoise:updateSceneWithShader(renderHazeNoiseParams)
+    render.restoreRenderTarget()
+  
+    renderHazeApplyParams.textures['txBase.1'] = tex.txBaseNoise
+    renderHazeApplyParams.values.gBlurRadius = tex.gBlurRadius
+    render.fullscreenPass(renderHazeApplyParams)
+  end)
 end
 
 local subscribed ---@type fun()?
