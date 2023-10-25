@@ -27,6 +27,10 @@ local windOffset = vec3()
 local windVelocity = vec3()
 local texData = {}
 
+table.insert(OnResolutionChange, function ()
+  table.clear(texData)
+end)
+
 local function createPassData(uniqueKey)
   local size = render.getRenderTargetSize()
   return {
@@ -77,7 +81,7 @@ local subscribed ---@type fun()?
 
 function UpdateRainHaze(dt)
   local cc = CurrentConditions
-  intensity = (cc.rain ^ 0.6) * (cc.fog + cc.thunder)
+  intensity = (cc.rain ^ 0.6) * (FinalFog + cc.thunder)
   -- intensity = 1
   if intensity < 0.2 then
     if subscribed then

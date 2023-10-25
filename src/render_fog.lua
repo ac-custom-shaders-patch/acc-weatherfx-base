@@ -40,7 +40,7 @@ local needsHighFogEffect = nil
 
 function UpdateAboveFog(dt)
   local cc = CurrentConditions
-  intensity = math.lerpInvSat(cc.fog, 0.8, 1)
+  intensity = math.lerpInvSat(FinalFog, 0.8, 1)
   if intensity == 0 then
     if subscribed then
       subscribed()

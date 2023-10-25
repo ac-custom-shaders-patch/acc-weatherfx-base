@@ -8,7 +8,12 @@
 -- to fork this script and make your own version of it, of course, feel free to use a more readable approach.
 --------
 
-if ac.getSim().isShowroomMode or ac.getSim().isPreviewsGenerationMode then
+---Functions from this list will be called when resolution changes.
+---@type fun()[]
+OnResolutionChange = {}
+
+local sim = ac.getSim()
+if sim.isShowroomMode or sim.isPreviewsGenerationMode then
   require 'src/showroom_mode'
   return
 end
@@ -133,7 +138,7 @@ end
 function script.update(dt)
   -- This value is time passed in seconds (as dt), but taking into account pause, slow
   -- motion or fast forward, but not time scale in conditions
-  local gameDT = ac.getGameDeltaT()
+  local gameDT = sim.dt
 
   -- Clouds operate on actual passed time
   local cloudsDT = TimelapsyCloudSpeed and getCloudsDeltaT(dt, gameDT) or gameDT
@@ -154,9 +159,13 @@ function script.update(dt)
 
   -- Increasing refresh rate for faster moving clouds
   if math.abs(cloudsDT) > 0.5 then 
-    ruClouds.skip = 0
+    ruClouds.skip = 0 
+    ac.invalidateCloudReflections()
   elseif math.abs(cloudsDT) > 0.05 then 
     ruClouds.skip = 1
+    if sim.frame % 4 == 0 then      
+      ac.invalidateCloudReflections()
+    end
   elseif math.abs(cloudsDT) < 0.03 then 
     ruClouds.skip = 2
   end
@@ -183,8 +192,8 @@ function script.update(dt)
 
   -- For testing replays
   -- ac.debug('car.isRaceFinished', ac.getCar(0).isRaceFinished)
-  -- ac.debug('sim.raceSessionType', ac.getSim().raceSessionType)
-  -- ac.debug('sim.currentSessionIndex', ac.getSim().currentSessionIndex)
+  -- ac.debug('sim.raceSessionType', sim.raceSessionType)
+  -- ac.debug('sim.currentSessionIndex', sim.currentSessionIndex)
   -- ac.debug('getSession(0).type', ac.getSession(0).type)
   -- ac.debug('getSession(0).laps', ac.getSession(0).laps)
   -- ac.debug('getSession(0).isOver', ac.getSession(0).isOver)
@@ -215,3 +224,13 @@ function script.frameBegin(dt)
   -- Update audio (for now, just rain)
   ApplyAudio(dt)
 end
+
+-- To stop script from reloading with resolution changes, adding a subscription to the event
+ac.onResolutionChange(function (newSize, makingScreenshot)
+  ac.log('Resolution change', newSize, makingScreenshot)
+
+  -- Instead of manually disposing all created textures, the idea is to clear out all the tables
+  -- containing those and then run garbage collector and let CSP clean things up automatically
+  for _, v in ipairs(OnResolutionChange) do v() end
+  collectgarbage('collect')
+end)

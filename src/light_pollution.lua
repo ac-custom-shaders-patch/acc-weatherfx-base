@@ -8,7 +8,6 @@
 -- Global light pollution values
 LightPollutionValue = 0
 LightPollutionSkyFeaturesMult = 1
-LightPollutionExtraAmbient = rgb()
 
 -- Read light pollution
 local lightPolData = ac.getTrackLightPollution()
@@ -77,7 +76,7 @@ function UpdateLightPollution()
   local distanceK = math.saturate(lightPolData.radius * polDistanceInv) 
 
   -- Set gradient color: use pollution tint scaled by density and brightness in settings, plus multiplied by distance 
-  -- coefficient in 0.25 power. why that? looks better like that to me, that’s all
+  -- coefficient in 0.25 power
   lightPolGradient.color:set(lightPolData.tint):scale(lightPolData.density * (distanceK ^ 0.25) * polBrightness)
 
   -- Calculating light pollution direction and size: for distant pollution (with lower distance coefficient),
@@ -92,6 +91,5 @@ function UpdateLightPollution()
   -- Updating those public cached values
   LightPollutionValue = lightPolData.density * distanceK
   LightPollutionSkyFeaturesMult = 1 - LightPollutionValue * 0.9
-  LightPollutionExtraAmbient:set(lightPolData.tint):scale(LightPollutionValue * polBrightness)
   remoteLightPollution:set(lightPolData.tint):scale(distanceK * NightK * lightPolData.density * polBrightness)
 end

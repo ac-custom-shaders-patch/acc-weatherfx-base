@@ -35,6 +35,10 @@ local auroraAmbientColor = rgb(0.3, 1, 0)
 local auroraTime = -math.random() * 1e6
 local temporalSmoothing = 0.05
 
+table.insert(OnResolutionChange, function ()
+  table.clear(texData)
+end)
+
 local function createPassData(uniqueKey)
   local size = render.getRenderTargetSize()
   local mainFrame = uniqueKey == 100

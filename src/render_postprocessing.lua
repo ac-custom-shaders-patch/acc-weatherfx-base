@@ -17,6 +17,10 @@
 
 local buffersCache = {}
 
+table.insert(OnResolutionChange, function ()
+  table.clear(buffersCache)
+end)
+
 ---@param resolution vec2
 local function createPPData(resolution)
   resolution = resolution:clone():scale(0.5)
@@ -213,6 +217,11 @@ ac.onPostProcessing(function (params, exposure, mainPass, updateExponent)
   local data = table.getOrCreate(buffersCache, (mainPass and 0 or 1e7) + rtSize.y * 10000 + rtSize.x, createPPData, rtSize)
   -- ac.log(rtSize, mainPass, updateExponent)
 
+  -- if ac.isKeyReleased(ac.KeyIndex.F12) then
+  --   ui.ExtraCanvas(rtSize, 1, render.TextureFormat.R32G32B32A32.Float):copyFrom('dynamic::pp::hdr'):save('C:/test/raw.dds', ac.ImageFormat.DDS)
+  --   ui.toast(ui.Icons.Confirm, 'Raw screenshot saved')
+  -- end
+
   local finalExposure = params.tonemapExposure
   if params.autoExposureEnabled then
     if updateExponent and mainPass then
@@ -221,7 +230,7 @@ ac.onPostProcessing(function (params, exposure, mainPass, updateExponent)
       aeMeasure2:updateWithShader(aePass2)
       aeMeasure2:accessData(gotAEData)
       if aeMeasured > 0 then
-        local autoExposure = params.autoExposureTarget * exposure / aeMeasured
+        local autoExposure = params.autoExposureTarget * math.lerp(1, 0.5, NightK) * exposure / aeMeasured
         aeCurrent = math.applyLag(aeCurrent, autoExposure, 0.95, ac.getDeltaT())
         ac.store('wfx.base.ae', aeCurrent)
       end
@@ -377,7 +386,7 @@ ac.onPostProcessing(function (params, exposure, mainPass, updateExponent)
           return frac((p4.xxyz + p4.yzzw) * p4.zywx);
         }
         float4 main(PS_IN pin) {
-          return hash42(pin.Tex * 48.6119);
+          return hash42(pin.Tex * 384.611979);
         }]]
       })
       data.pass2Params.textures.txGrain = noise or 'dynamic::noise'

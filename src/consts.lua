@@ -24,7 +24,7 @@ SunRaysIntensity = 0.02 -- some good PP-filters expode with sun rays at full str
 SunRaysCustom = false -- use fully custom sun ray parameters instead of SunRaysIntensity
 SunColor = rgb(1, 0.95, 0.9)
 MoonColor = rgb(0.6, 1.2, 2):scale(1.5)
-LightPollutionBrightness = 0.1
+LightPollutionBrightness = 0.05
 
 CloudUseAtlas = true
 CloudSpawnScale = 0.5

@@ -378,7 +378,7 @@ local function updateCloudCells(dt)
   windOffset:add(windDir * (windSpeed * dt))
 
   local cellIndex = CloudsCell.getCellIndex(cameraPos)
-  local cellDistance = math.ceil(CloudCellDistance * (1 - CurrentConditions.fog * 0.3))
+  local cellDistance = math.ceil(CloudCellDistance * (1 - FinalFog * 0.3))
   for x = -cellDistance, cellDistance do
     for y = -cellDistance, cellDistance do
       local n = CloudsCell.getCellNeighbour(cellIndex, x, y)

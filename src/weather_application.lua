@@ -8,6 +8,7 @@ NightK = 0 -- 1 at nights, 0 during the day
 SunDir = vec3(0, 1, 0)
 MoonDir = vec3(0, 1, 0)
 GodraysColor = rgb()
+FinalFog = 0
 
 -- Various local variables, changing with each update, something easy to deal with things. There is 
 -- no need to edit any of those values if you want to change anything, please proceed further to
@@ -56,6 +57,7 @@ function ApplySky()
   ac.getMoonDirectionTo(MoonDir)
 
   NightK = math.lerpInvSat(SunDir.y, 0.05, -0.2)
+  FinalFog = math.pow(CurrentConditions.fog, 1 - 0.5 * NightK)
 
   -- Eclipse coefficients. You can test full eclipse with Brasov track on 08/11/1999:
   -- https://www.racedepartment.com/downloads/brasov-romania.28239/
@@ -77,7 +79,7 @@ function ApplySky()
   local darkNightSky = math.max(NightK, eclipseFullK * 0.85) -- sky getting black
   local purpleAdjustment = sunsetK -- slightly alter color for sunsets
   local brightDayAdjustment = math.lerpInvSat(math.max(0, SunDir.y), 0.2, 0.6) -- make sky clearer during the day
-  local skyVisibility = math.sqrt((1 - CurrentConditions.fog) * CurrentConditions.clear)
+  local skyVisibility = math.sqrt((1 - FinalFog) * CurrentConditions.clear)
 
   -- Varying with presets:
   ac.setSkyV2Primaries(ac.SkyRegion.All, vec3(6.8e-7, 5.5e-7, math.lerp(4.5e-7, 5.1e-7, purpleAdjustment)))
@@ -184,7 +186,7 @@ function ApplyLight()
   lightColor:scale(math.lerpInvSat(lightDir.y, -0.03, 0) * SunLightIntensity)
 
   -- Dim godrays even more
-  GodraysColor:set(lightColor):scale(math.lerpInvSat(lightDir.y, 0.01, 0.02) * (1 - CurrentConditions.fog ^ 2))
+  GodraysColor:set(lightColor):scale(math.lerpInvSat(lightDir.y, 0.01, 0.02) * (1 - FinalFog ^ 2))
 
   -- And godrays!
   if SunRaysCustom then
@@ -220,8 +222,7 @@ local ambientExtraDirection = vec3()
 function ApplyAmbient()
   -- Base ambient color: uses sky color at zenith with extra addition of light pollution, adjusted for conditions
   ambientBaseColor
-    :set(LightPollutionExtraAmbient)
-    :add(skyTopColor)
+    :set(skyTopColor)
     :adjustSaturation(CurrentConditions.saturation)
 
   local rain = math.min(CurrentConditions.wetness * 50, 1)
@@ -250,7 +251,7 @@ function ApplyAmbient()
     ac.setExtraAmbientDirection(ambientExtraDirection:set(SunDir.x, math.max(SunDir.y, 0.1), SunDir.z))
   else
     local directedAmbient = math.lerpInvSat(CurrentConditions.clear, 0.3, 0) * math.lerp(0.3, 0.6, CurrentConditions.cloudsDensity) 
-      * (1 - NightK) * (1 - CurrentConditions.fog)
+      * (1 - NightK) * (1 - FinalFog)
     if directedAmbient > 0 then
       ambientExtraColor:set(ambientAdjColor):scale(1 - directedAmbient)
       ac.setAmbientColor(ambientExtraColor)
@@ -292,7 +293,7 @@ function ApplyFog(dt)
   ac.calculateSkyColorTo(skyHorizonColor, vec3(SunDir.z, 0, -SunDir.x), false, false)
   ac.setFogColor(skyHorizonColor:scale(SkyBrightness))
 
-  local ccFog = CurrentConditions.fog
+  local ccFog = FinalFog
   local fogDistance = math.lerp(1500, 35, ccFog)
   local fogHorizon = math.min(1, math.lerp(0.5, 1.1, ccFog ^ 0.5))
   local fogDensity = math.lerp(0.03, 1, ccFog ^ 2)
@@ -384,11 +385,11 @@ function ApplyAdaptiveShadows()
     else ac.setShadowsResolution(1024) end
     ac.setShadows(ac.ShadowsState.On)
   elseif BlurShadowsWithFog then
-    if CurrentConditions.fog > 0.96 then ac.setShadowsResolution(256)
-    elseif CurrentConditions.fog > 0.92 then ac.setShadowsResolution(384)
-    elseif CurrentConditions.fog > 0.88 then ac.setShadowsResolution(512)
-    elseif CurrentConditions.fog > 0.84 then ac.setShadowsResolution(768)
-    elseif CurrentConditions.fog > 0.8 then ac.setShadowsResolution(1024)
+    if FinalFog > 0.96 then ac.setShadowsResolution(256)
+    elseif FinalFog > 0.92 then ac.setShadowsResolution(384)
+    elseif FinalFog > 0.88 then ac.setShadowsResolution(512)
+    elseif FinalFog > 0.84 then ac.setShadowsResolution(768)
+    elseif FinalFog > 0.8 then ac.setShadowsResolution(1024)
     else ac.resetShadowsResolution() end
     ac.setShadows(ac.ShadowsState.On)
   else
@@ -462,7 +463,7 @@ function ApplyFakeExposure(dt)
 
   ac.setWeatherLightsMultiplier(math.max(lightsMult * 1.25 - 0.25, 0) * 2) -- how bright are lights
   ac.setTrueEmissiveMultiplier(lightsMult) -- how bright are extrafx emissives
-  ac.setGlowBrightness(lightsMult * 0.14) -- how bright are those distant emissive glows
+  ac.setGlowBrightness(lightsMult * 0.15) -- how bright are those distant emissive glows
   ac.setEmissiveMultiplier(0.9 + lightsMult * 0.3) -- how bright are emissives
   ac.setWeatherTrackLightsMultiplierThreshold(0.01) -- let make lights switch on early for smoothness
 
