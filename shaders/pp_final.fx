@@ -172,7 +172,7 @@ float3 computeLensFlare(float2 uv, float2 pos) {
 }
 
 #ifdef USE_FILM_GRAIN
-  float4 sampleGrain(float2 uv){
+  float sampleGrain(float2 uv){
     float4 r = txGrain.SampleLevel(samLinearSimple, uv, 0);
     float p = frac(gTime * 3);
     float w1 = saturate(abs(p * 4 - 1));
@@ -259,9 +259,12 @@ float4 main(PS_IN pin){
   #endif
 
   #ifdef USE_FILM_GRAIN
-    float4 noise = sampleGrain(pin.PosH.xy / 512.);
-    float response = saturate(1 - dot(col.g, 1/3.));
-    col.rgb *= 0.9 + 0.2 * noise.rgb * pow(response, 16);
+    float3 noise = float3(
+      sampleGrain(pin.PosH.xy / 512.), 
+      sampleGrain(pin.PosH.xy / 512. + 0.1),
+      sampleGrain(pin.PosH.xy / 512. + 0.2));
+    float response = saturate(1 - dot(col.rgb, 1/3.));
+    col.rgb *= lerp(1, 0.8 + 0.4 * noise.rgb, pow(response, 6));
   #endif
   
   col.w = 1;
