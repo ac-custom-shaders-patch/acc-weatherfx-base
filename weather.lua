@@ -34,9 +34,6 @@ require 'src/render'                -- render core
 require 'src/render_aurora'         -- extra effect: aurora
 require 'src/render_rain'           -- extra effect: rain haze
 require 'src/render_fog'            -- extra effect: fog covering tops of high buildings in foggy conditions
--- require 'src/render_test'           -- extra effect: testing a shader for a billboard on track
--- require 'src/render_surface'        -- extra effect: testing a shader for a billboard on track
--- require 'src/tests'                 -- some dev tests
 
 -- Use asyncronous textures loading for faster loading
 ac.setAsyncTextureLoading(true)
@@ -61,10 +58,6 @@ ac.setSkyStarsMap('textures/weather_fx/starmap.dds')
 ac.setSkyMoonTexture('textures/weather_fx/moon.dds')
 ac.setSkyMoonGradient(0)
 
--- Sun, moon and the planets look too tiny without an extra size boost. If you’re changing it, don’t forget to readjust stuff 
--- related to eclipses in `weather_application.lua`
--- ac.setSkySunMoonSizeMultiplier(2)
-
 -- UPD: Have to use original size for moon eclipse to look properly:
 ac.setSkySunMoonSizeMultiplier(1)
 ac.setMoonEclipse(true)
@@ -74,9 +67,6 @@ ac.setCloudShadowMaps(true)
 
 -- Do not update cloud maps (like cloud shadows) without manual invalidation
 ac.setManualCloudsInvalidation(true)
-
--- -- Ignore cloud.opacity and use only cloud.shadowOpacity for cloud shadows
--- ac.setCloudShadowIndependantOpacity(true)
 
 -- Set cloud shadow map parameters
 ac.setCloudShadowDistance(6e3)
@@ -133,8 +123,6 @@ local function getCloudsDeltaT(dt, gameDT)
   return dt * math.sign(cloudsDeltaTime) * math.lerp(1, ratio, 0.4)
 end
 
--- local gif = ui.GIFPlayer('C:/Games/AssettoCorsa/apps/lua/iclicker/1.gif')
-
 function script.update(dt)
   -- This value is time passed in seconds (as dt), but taking into account pause, slow
   -- motion or fast forward, but not time scale in conditions
@@ -184,36 +172,6 @@ function script.update(dt)
 
   -- Uncomment to check how much garbage is generated each frame (slows things down)
   -- RunGC()
-
-  -- For development only, for testing some things (requires 'src/tests')
-  -- RunDevTests()
-
-  -- ac.setShadowsResolution(2048)
-
-  -- For testing replays
-  -- ac.debug('car.isRaceFinished', ac.getCar(0).isRaceFinished)
-  -- ac.debug('sim.raceSessionType', sim.raceSessionType)
-  -- ac.debug('sim.currentSessionIndex', sim.currentSessionIndex)
-  -- ac.debug('getSession(0).type', ac.getSession(0).type)
-  -- ac.debug('getSession(0).laps', ac.getSession(0).laps)
-  -- ac.debug('getSession(0).isOver', ac.getSession(0).isOver)
-
-  -- ac.setPpTonemapFunction({
-  --   textures = {
-  --     -- txNoiseLr = 'rain_fx/puddles.dds',
-  --     txGif = gif
-  --   },
-  --   values = {
-  --     gTime = os.preciseClock(),
-  --   },
-  --   defines = {
-  --     __CSP_PROVIDE_TEXCOORDS = true
-  --   },
-  --   shader = 'shaders/tonemapping_test.fx',
-  --   cacheKey = 0
-  -- })
-
-  -- ac.debug(mat4x4.euler(1, 2, 3))
 end
 
 if ScriptSettings.LIGHTWEIGHT_REPLACEMENT then

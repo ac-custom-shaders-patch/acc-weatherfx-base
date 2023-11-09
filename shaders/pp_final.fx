@@ -65,6 +65,28 @@ float tm_filmic(float x) {
 	return ((x * (0.22 * x + 0.1 * 0.3) + 0.2 * 0.01) / (x * (0.22 * x + 0.3) + 0.2 * 0.3)) - 0.01 / 0.3;
 }
 
+// From: https://iolite-engine.com/blog_posts/minimal_agx_implementation
+float3 tm_agx(float3 val) {
+  val = saturate((log2(mul(float3x3(
+    0.842479062253094, 0.0784335999999992, 0.0792237451477643,
+    0.0423282422610123,  0.878468636469772,  0.0791661274605434,
+    0.0423756549057051, 0.0784336, 0.879142973793104), pow(val, 2.2))) + 12.47393) / 16.5);
+
+  float3 va2 = val * val;
+  float3 va4 = va2 * va2;  
+  val = 15.5 * va4 * va2 - 40.14 * va4 * val + 31.96 * va4 
+    - 6.868 * va2 * val + 0.4298 * va2 + 0.1191 * val - 0.00232;
+
+  float luma = dot(val, float3(0.2126, 0.7152, 0.0722));
+  float punch = saturate((W - 2) / 10);
+  val = luma + (1 + 0.4 * punch) * (pow(val, 1 + 0.35 * punch) - luma);
+
+  return mul(float3x3(
+    1.19687900512017, -0.0980208811401368, -0.0990297440797205,
+    -0.0528968517574562, 1.15190312990417, -0.0989611768448433,
+    -0.0529716355144438, -0.0980434501171241, 1.15107367264116), val);
+}
+
 float3 colorGrading(float3 col) {
   #if TONEMAP_FN == 0 // linear
     return col;
@@ -110,9 +132,11 @@ float3 colorGrading(float3 col) {
   #elif TONEMAP_FN == 15 // juicy
     col = max(col, 0.0001);
     float luma = dot(col, 0.3);
-    float tone = exp(-1 / (2 * luma + 0.2)) / luma;
+    float tone = exp(-1 / (2 * luma + 0.2)) / max(0.01, luma);
     col = lerp(luma, col, lerp(pow(max(tone, 0), 0.25), tone, saturate((W - 2) / 10)));
     return col * tone;
+  #elif TONEMAP_FN == 16 // agx
+    return tm_agx(col);
   #else
     return col.g;
   #endif
@@ -172,19 +196,25 @@ float3 computeLensFlare(float2 uv, float2 pos) {
 }
 
 #ifdef USE_FILM_GRAIN
-  float sampleGrain(float2 uv){
-    float4 r = txGrain.SampleLevel(samLinearSimple, uv, 0);
-    float p = frac(gTime * 3);
-    float w1 = saturate(abs(p * 4 - 1));
-    float w2 = saturate(abs(p * 4 - 2));
-    float w3 = saturate(abs(p * 4 - 3));
-    float w4 = saturate(p < 0.5 ? p * 4 : -(p * 4 - 4));
-    return dot(r, float4(w1, w2, w3, w4));
+  float3 sampleGrain3(float2 uv){
+    float4 noise = txNoise.SampleLevel(samLinearSimple, uv.xy / 1024, 0);
+    float timeAdjusted = gTime + noise.x * 0.1;
+    float timeInput = timeAdjusted * 20;
+    float transition = frac(timeInput);
+    float3 frame1 = txGrain.SampleLevel(samLinearSimple, (uv / 256 + ((int)(timeInput) & 15)) * float2(1, 1. / 16) + floor(timeAdjusted) * 0.2, 0).rgb;
+    float3 frame2 = txGrain.SampleLevel(samLinearSimple, (uv / 256 + ((int)(timeInput + 1) & 15)) * float2(1, 1. / 16) + floor(timeAdjusted) * 0.2, 0).rgb;
+    return lerp(frame1, frame2, transition);
   }
 #endif
 
 float2 lensDistortion(float2 uv) {
   return (uv - 0.5) * (1 + dot2(uv - 0.5) * gLensDistortion) / (1 + gLensDistortion / 4) + 0.5;
+}
+
+float3 hsv2rgb(float3 c) {
+  float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+  float3 p = abs(frac(c.xxx + K.xyz) * 6.0 - K.www);
+  return c.z * lerp(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
 float4 main(PS_IN pin){
@@ -209,8 +239,10 @@ float4 main(PS_IN pin){
     float4 blur1 = txBlur1.SampleLevel(samLinearSimple, pin.Tex, 0);
     float4 blur2 = txBlur2.SampleLevel(samLinearSimple, pin.Tex, 0);
     float3 blurT = blur1.rgb + blur2.rgb * 3;
-    col.rgb += blurT * gGlareLuminance;
+    col.rgb += pow(blurT, 2) * 0.1 * gGlareLuminance;
   #endif
+
+  // col.rgb = hsv2rgb(float3(pin.Tex.y * 2, 1, 1)) * pow(pin.Tex.x, 8) * 1e6;
 
   #ifdef USE_SUN_RAYS
     float2 sunPos = (gSunPosition * 2 - 1) * gVignetteRatio;
@@ -259,12 +291,9 @@ float4 main(PS_IN pin){
   #endif
 
   #ifdef USE_FILM_GRAIN
-    float3 noise = float3(
-      sampleGrain(pin.PosH.xy / 512.), 
-      sampleGrain(pin.PosH.xy / 512. + 0.1),
-      sampleGrain(pin.PosH.xy / 512. + 0.2));
+    float3 noise = sampleGrain3(pin.PosH.xy);
     float response = saturate(1 - dot(col.rgb, 1/3.));
-    col.rgb *= lerp(1, 0.8 + 0.4 * noise.rgb, pow(response, 6));
+    col.rgb *= lerp(1, 2 * noise.rgb, 0.4 * pow(response, 6));
   #endif
   
   col.w = 1;

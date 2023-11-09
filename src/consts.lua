@@ -2,7 +2,7 @@
 -- Some general constant values, should not be changed real-time.
 --------
 
-SceneBrightnessMultNoPP = 2.5  -- without post-processing active: brightness multiplier for the whole scene
+SceneBrightnessMultNoPP = 2  -- without post-processing active: brightness multiplier for the whole scene
 SceneBrightnessMultPP = 3  -- with post-processing active: brightness multiplier for the scene (in most cases, gets compensated by auto-exposure)
 FilterBrightnessMultPP = 1.0 -- with post-processing active: brightness adjustment applied after auto-exposure
 

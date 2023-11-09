@@ -197,30 +197,8 @@ SunRaysCustom = true
 
 local sim = ac.getSim()
 
-ac.onPostProcessing(function (params, exposure, mainPass, updateExponent)
-  -- if ac.isKeyDown(ac.KeyIndex.Space) then return false end
-
-  -- if ac.isKeyDown(ac.KeyIndex.Space) then 
-  --   if not _G.test then _G.test = ui.ExtraCanvas(render.getRenderTargetSize(), 1, render.TextureFormat.R16G16B16A16.Float) end
-  --   _G.test:updateWithShader({
-  --     textures = {
-  --       txIn = 'dynamic::pp::hdr'
-  --     },
-  --     shader = [[float4 main(PS_IN pin) {
-  --       return txIn.SampleLevel(samLinearSimple, pin.Tex, 0).bgra;
-  --     }]]
-  --   })
-  --   return _G.test 
-  -- end
-
-  local rtSize = render.getRenderTargetSize()
+ac.onPostProcessing(function (params, exposure, mainPass, updateExponent, rtSize)
   local data = table.getOrCreate(buffersCache, (mainPass and 0 or 1e7) + rtSize.y * 10000 + rtSize.x, createPPData, rtSize)
-  -- ac.log(rtSize, mainPass, updateExponent)
-
-  -- if ac.isKeyReleased(ac.KeyIndex.F12) then
-  --   ui.ExtraCanvas(rtSize, 1, render.TextureFormat.R32G32B32A32.Float):copyFrom('dynamic::pp::hdr'):save('C:/test/raw.dds', ac.ImageFormat.DDS)
-  --   ui.toast(ui.Icons.Confirm, 'Raw screenshot saved')
-  -- end
 
   local finalExposure = params.tonemapExposure
   if params.autoExposureEnabled then
@@ -270,7 +248,6 @@ ac.onPostProcessing(function (params, exposure, mainPass, updateExponent)
     data.useDof = useDof
     data.pass1Params.textures.txInput = useDof and data.dofOutput or 'dynamic::pp::hdr'
     data.pass2Params.textures.txInput = useDof and data.dofOutput or 'dynamic::pp::hdr'
-    ac.debug('DOF quality', params.dofQuality)
   end
 
   if useDof then
@@ -377,22 +354,26 @@ ac.onPostProcessing(function (params, exposure, mainPass, updateExponent)
     data.pass2Params.cacheKey = bit.bor(bit.band(data.pass2Params.cacheKey, bit.bnot(8192)), useFilmGrain and 8192 or 0)
 
     if useFilmGrain then
-      local noise = ui.ExtraCanvas(256)
+      local noise = ui.ExtraCanvas(vec2(128, 2048))
       noise:updateWithShader({
-        shader = [[          
-        float4 hash42(float2 p) {
-          float4 p4 = frac(float4(p.xyxy) * float4(0.1031, 0.1030, 0.0973, 0.1099));
-          p4 += dot(p4, p4.wzxy + 33.33);
-          return frac((p4.xxyz + p4.yzzw) * p4.zywx);
+        shader = [[
+        float4 hash4(float2 p) {
+          float4 q = float4(dot(p, float2(127.1, 311.7)), 
+            dot(p, float2(269.5, 183.3)), 
+            dot(p, float2(419.2, 371.9)), 
+            dot(p, float2(381.2, 687.4)));
+          return frac(sin(q) * 43758.5453);
         }
         float4 main(PS_IN pin) {
-          return hash42(pin.Tex * 384.611979);
+          float4 col = hash4(pin.Tex);
+          col.rgb = lerp(col.rgb, dot(col.rgb, 0.33), 0.5);
+          return col;
         }]]
       })
       data.pass2Params.textures.txGrain = noise or 'dynamic::noise'
     end
   end
-  if useFilmGrain then
+  if useFilmGrain and not sim.isMakingScreenshot then
     data.pass2Params.values.gTime = sim.gameTime
   end
 

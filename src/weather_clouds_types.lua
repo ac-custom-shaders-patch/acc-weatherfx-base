@@ -95,8 +95,6 @@ function CloudTypes.Dynamic(cloud, pos)
   cloud.extras.nearbyCutoffOffset = math.lerp(-0.3, 0.3, math.random())
   cloud.extras.extraFidelity = cloud.extraFidelity
   cloud.extras.lowerK = math.lerpInvSat(pos.y, DynCloudsMaxHeight, DynCloudsMinHeight)
-
-  -- cloud.size:set(0.001, 0.001)
 end
 function CloudTypes.Bottom(cloud, mainCloud)
   cloudutils.setTexture(cloud, CloudTextures.Bottoms)
@@ -112,8 +110,6 @@ function CloudTypes.Bottom(cloud, mainCloud)
   cloudutils.setProcNormalShare(cloud, 0.2, 1.8)
   cloud.material = CloudMaterials.Bottom
   cloud.receiveShadowsOpacityMult = mainCloud.receiveShadowsOpacityMult
-
-  -- cloud.size:set(0.001, 0.001)
 end
 function CloudTypes.Hovering(cloud, pos)
   cloudutils.setTexture(cloud, CloudTextures.Hovering)
@@ -130,8 +126,6 @@ function CloudTypes.Hovering(cloud, pos)
   cloud.horizontalHeading = -1
   cloud.material = CloudMaterials.Hovering
   cloud.extras.extraFidelity = cloud.extraFidelity
-
-  -- cloud.size:set(0.001, 0.001)
 end
 function CloudTypes.Spread(cloud, pos)
   cloudutils.setTexture(cloud, CloudTextures.Spread)
@@ -152,8 +146,6 @@ function CloudTypes.Spread(cloud, pos)
   cloud.procScale:mul(vec2(1, 4))
   cloud.opacity = math.lerp(0.15, 0.35, math.random())
   cloud.extras.extraFidelity = cloud.extraFidelity
-
-  -- cloud.size:set(0.001, 0.001)
 end
 function CloudTypes.Low(cloud, pos, distance)
   local index = cloudutils.setTexture(cloud, CloudTextures.Flat)
@@ -178,8 +170,6 @@ function CloudTypes.Low(cloud, pos, distance)
     aspectRatio = 0.3
   })
   cloud.receiveShadowsOpacityMult = 0
-  
-  -- cloud.size:set(0.001, 0.001)
 end
 function CloudTypes.Test(cloud, pos, distance)
   local index = cloudutils.setTexture(cloud, CloudTextures.Bottoms)

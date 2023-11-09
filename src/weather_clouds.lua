@@ -445,9 +445,6 @@ for j = 1, 35 do
   end
 end
 
--- local testCloud = createCloud(CloudTypes.Dynamic, vec3(0, 1, 2), 0)
--- ac.weatherClouds[#ac.weatherClouds + 1] = testCloud
-
 function UpdateClouds(dt)
   windDir = CurrentConditions.windDir
   windSpeed = CurrentConditions.windSpeed * 4 -- clouds move faster up there
@@ -461,14 +458,3 @@ function UpdateClouds(dt)
   ac.sortClouds()
   ac.invalidateCloudMaps()
 end
-
--- local dome = ac.SkyCloudsCover()
--- dome.colorMultiplier = rgb(3, 3, 3):scale(0.1)
--- dome.opacityMultiplier = 0.5
--- dome.shadowOpacityMultiplier = 0
--- dome.ignoreTextureAlpha = false
--- dome:setFogParams(1, 3)
--- dome:setTexture(__dirname..'/../_0/cloudy_day_4k.dds')
--- dome:setMaskTexture(__dirname..'/../_0/mask.dds')
--- dome.maskOpacityMultiplier = 0.5
--- ac.weatherCloudsCovers:push(dome)

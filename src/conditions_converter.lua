@@ -92,12 +92,6 @@ fillValues(values, ac.WeatherType)
 
 -- Stuff for smooth transition
 local counter = 0
-local target = {}
-
-local function applyTarget(lagMult, key)
-  local ov = CurrentConditions[key]
-  CurrentConditions[key] = ov + (target[key] - ov) * lagMult
-end
 
 local function lerpConditions(conditions, lagMult, key)
   local vc = values[conditions.currentType]
@@ -146,10 +140,6 @@ function ReadConditions(dt)
   lerpConditionsRGB(conditions, lagMult, 'tint', dt)
   lerpConditions(conditions, lagMult, 'saturation')
   lerpConditions(conditions, lagMult, 'thunder')
-
-  -- ac.debug('altitude', ac.getAltitude())
-  -- ac.debug('camera', ac.getCameraPosition().y)
-  -- CurrentConditions.fog = math.lerp(CurrentConditions.fog, 1, math.max(0, 1 - math.abs(ac.getCameraPosition().y - 600) / 200))
 
   CurrentConditions.rain = conditions.rainIntensity
   CurrentConditions.wetness = conditions.rainWetness
