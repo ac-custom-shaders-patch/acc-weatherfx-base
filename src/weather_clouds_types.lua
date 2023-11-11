@@ -160,6 +160,7 @@ function CloudTypes.Low(cloud, pos, distance)
   cloud.orderBy = 1e12 + distance * 1e10
   cloud.extras.opacity = cloud.opacity
   cloud.extras.extraFidelity = cloud.extraFidelity
+  cloud.extras.randomOffset = math.atan2(pos.x, pos.y)
   cloud.extras.procMap = cloud.procMap:clone()
   cloudutils.setProcNormalShare(cloud, 0.2, 2)
   cloudutils.setPos(cloud, { 

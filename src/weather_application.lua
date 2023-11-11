@@ -44,6 +44,15 @@ skyCoverAddition.sizeStart = 2
 skyCoverAddition.direction = vec3(0, 1, 0)
 ac.addSkyExtraGradient(skyCoverAddition)
 
+-- Gradient to boost brightness towards horizon
+local skyHorizonAddition = nil
+skyHorizonAddition = ac.SkyExtraGradient()
+skyHorizonAddition.isAdditive = true
+skyHorizonAddition.sizeFull = 0.8
+skyHorizonAddition.sizeStart = 1.2
+skyHorizonAddition.direction = vec3(0, -1, 0)
+ac.addSkyExtraGradient(skyHorizonAddition)
+
 -- Custom post-processing brightness adjustment
 local ppBrightnessCorrection = ac.ColorCorrectionBrightness()
 ac.addWeatherColorCorrection(ppBrightnessCorrection)
@@ -107,6 +116,9 @@ function ApplySky()
     :set(math.lerp(1, 0.2, deepBlue), math.lerp(1, 0.8, deepBlue) * 1.1, math.lerp(1, 2, deepBlue) * 1.2)
     :mul(CurrentConditions.tint)
     :scale(skyTopColor.g * (1 - skyVisibility))
+  skyHorizonAddition.color:set(skyCoverAddition.color)
+  skyHorizonAddition.direction.x = SunDir.x * 0.2
+  skyHorizonAddition.direction.z = SunDir.z * 0.2
 
   -- Brightness adjustments:
   ac.setSkyV2BackgroundLight(ac.SkyRegion.All, 0.0)
@@ -507,14 +519,14 @@ CloudMaterials = {}
 
 -- Initialization for some static values
 CloudMaterials.Main = createGenericCloudMaterial({ 
-  contourExponent = 4,
-  contourIntensity = 0.1,
-  ambientConcentration = 0.1,  
+  contourExponent = 2,
+  contourIntensity = 0.2,
+  ambientConcentration = 0.1, 
   frontlitDiffuseConcentration = 0.8,
   backlitMultiplier = 4,
-  backlitOpacityMultiplier = 0.8,
-  backlitOpacityExponent = 3,
-  backlitExponent = 15,
+  backlitOpacityMultiplier = 0.5,
+  backlitOpacityExponent = 1,
+  backlitExponent = 20,
   specularExponent = 2,
   receiveShadowsOpacity = 0.9,
   fogMultiplier = 1
@@ -575,13 +587,12 @@ function UpdateCloudMaterials()
     :set(skyTopColor):adjustSaturation(math.lerp(0.8, 1.4, clearSunset)):scale(math.lerp(3.2, 2, clearSunset) * math.lerp(1.5, 1, ccCloudsDensity))
     -- :add(lightColor:clone():scale(0.1 * math.lerp(0.4, 0.2, sunsetK)))
     -- :add(LightPollutionExtraAmbient)
-  main.ambientConcentration = math.lerp(0.2, 0, NightK) * (0.3 + ccCloudsDensity)
+  main.ambientConcentration = math.lerp(0.2, 0, NightK) * (0.3 + ccCloudsDensity) * (1 - ccClouds * 0.5)
   main.extraDownlit:set(skySunColor):scale(math.lerp(0.2, 0.1, sunsetK) * ccClear)
   main.frontlitMultiplier = math.lerp(1 + ccClear, 0.5 + ccClear * 0.8, NightK)
   main.specularPower = math.lerp(1, 0.1, NightK)
   main.frontlitDiffuseConcentration = math.lerp(0.3, 0.8, sunsetK)
-  main.backlitMultiplier = math.lerp(0, 4, ccClear * (1 - ccClouds))
-  main.backlitOpacityMultiplier = math.lerp(2, 0.8, ccClear * (1 - ccClouds))
+  main.backlitMultiplier = math.lerp(0, 6, ccClear)
 
   -- Wet look
   local colorValue = math.lerp(0.15, 0.05, ccCloudsDensity)
