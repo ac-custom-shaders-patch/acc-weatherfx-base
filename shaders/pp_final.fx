@@ -67,10 +67,14 @@ float tm_filmic(float x) {
 
 // From: https://iolite-engine.com/blog_posts/minimal_agx_implementation
 float3 tm_agx(float3 val) {
+  float3 higher = pow((val + 0.055) / 1.055, 2.4);
+  float3 lower = val / 12.92;  
+  val = lerp(higher, lower, val < 0.04045);
+
   val = saturate((log2(mul(float3x3(
     0.842479062253094, 0.0784335999999992, 0.0792237451477643,
     0.0423282422610123,  0.878468636469772,  0.0791661274605434,
-    0.0423756549057051, 0.0784336, 0.879142973793104), pow(val, 2.2))) + 12.47393) / 16.5);
+    0.0423756549057051, 0.0784336, 0.879142973793104), val)) + 12.47393) / 16.5);
 
   float3 va2 = val * val;
   float3 va4 = va2 * va2;  
@@ -242,7 +246,8 @@ float4 main(PS_IN pin){
     col.rgb += pow(blurT, 2) * 0.1 * gGlareLuminance;
   #endif
 
-  // col.rgb = hsv2rgb(float3(pin.Tex.y * 2, 1, 1)) * pow(pin.Tex.x, 8) * 1e6;
+  // For testing tonemapping functions:
+  // col.rgb = hsv2rgb(float3(pin.Tex.y * 2, 1, 1)) * pow(pin.Tex.x, 4) * 1e3;
 
   #ifdef USE_SUN_RAYS
     float2 sunPos = (gSunPosition * 2 - 1) * gVignetteRatio;

@@ -81,7 +81,8 @@ local subscribed ---@type fun()?
 
 function UpdateRainHaze(dt)
   local cc = CurrentConditions
-  intensity = (cc.rain ^ 0.6) * (FinalFog + cc.thunder)
+  local rain = 1.1 * cc.rain / (0.1 + cc.rain)
+  intensity = rain * (FinalFog + cc.thunder)
   -- intensity = 1
   if intensity < 0.2 then
     if subscribed then

@@ -3,13 +3,6 @@
 -- cloud materials.
 --------
 
--- Global weather values
-NightK = 0 -- 1 at nights, 0 during the day
-SunDir = vec3(0, 1, 0)
-MoonDir = vec3(0, 1, 0)
-GodraysColor = rgb()
-FinalFog = 0
-
 -- Various local variables, changing with each update, something easy to deal with things. There is 
 -- no need to edit any of those values if you want to change anything, please proceed further to
 -- actual functions setting that stuff
@@ -52,6 +45,15 @@ skyHorizonAddition.sizeFull = 0.8
 skyHorizonAddition.sizeStart = 1.2
 skyHorizonAddition.direction = vec3(0, -1, 0)
 ac.addSkyExtraGradient(skyHorizonAddition)
+
+-- Gradient to boost brightness towards horizon
+local cityHaze = nil
+cityHaze = ac.SkyExtraGradient()
+cityHaze.isAdditive = false
+cityHaze.sizeFull = 1
+cityHaze.sizeStart = 1.2
+cityHaze.exponent = 20
+cityHaze.direction = vec3(0, -1, 0)
 
 -- Custom post-processing brightness adjustment
 local ppBrightnessCorrection = ac.ColorCorrectionBrightness()
@@ -120,6 +122,22 @@ function ApplySky()
   skyHorizonAddition.direction.x = SunDir.x * 0.2
   skyHorizonAddition.direction.z = SunDir.z * 0.2
 
+  local newCityHaze = (1 - sunsetK) * (1 - CurrentConditions.clouds) * CurrentConditions.clear 
+    * math.pow(math.saturateN(LightPollutionValue), 2) * math.saturateN(0.2 + ac.getSim().ambientTemperature / 60)
+  if math.abs(newCityHaze - CityHaze) > 0.01 then
+    if (newCityHaze ~= 0) ~= (CityHaze ~= 0) then
+      if newCityHaze ~= 0 then
+        ac.addSkyExtraGradient(cityHaze)
+      else
+        ac.skyExtraGradients:erase(cityHaze)
+      end
+    end
+    CityHaze = newCityHaze
+    cityHaze.color.r = math.lerp(1, 1.8, newCityHaze)
+    cityHaze.color.g = math.lerp(1, 0.9, newCityHaze)
+    cityHaze.color.b = math.lerp(1, 0.5, newCityHaze)
+  end
+
   -- Brightness adjustments:
   ac.setSkyV2BackgroundLight(ac.SkyRegion.All, 0.0)
   ac.setSkyV2Luminance(ac.SkyRegion.All, math.lerp(0, 0.3, math.pow(1 - darkNightSky, 4)))
@@ -132,7 +150,7 @@ function ApplySky()
   ac.setSkyV2YOffset(ac.SkyRegion.All, 0.1)
   ac.setSkyV2YScale(ac.SkyRegion.All, 0.9)
 
-  local rainbowIntensity = math.saturateN(CurrentConditions.rain * CurrentConditions.clear * 10) * math.lerpInvSat(SunDir.y, 0.02, 0.06)
+  local rainbowIntensity = math.saturateN(CurrentConditions.rain * 50) * CurrentConditions.clear * math.lerpInvSat(SunDir.y, 0.02, 0.06)
   ac.setSkyV2Rainbow(rainbowIntensity)
   ac.setSkyV2RainbowSecondary(0.2)
   ac.setSkyV2RainbowDarkening(math.lerp(1, 0.8, rainbowIntensity))
@@ -306,6 +324,7 @@ function ApplyFog(dt)
   ac.setFogColor(skyHorizonColor:scale(SkyBrightness))
 
   local ccFog = FinalFog
+  ccFog = math.lerp(ccFog, 1, CityHaze * 0.5)
   local fogDistance = math.lerp(1500, 35, ccFog)
   local fogHorizon = math.min(1, math.lerp(0.5, 1.1, ccFog ^ 0.5))
   local fogDensity = math.lerp(0.03, 1, ccFog ^ 2)
@@ -313,7 +332,7 @@ function ApplyFog(dt)
 
   local groundY = ac.getGroundYApproximation()
   ac.getCameraPositionTo(cameraPos)
-  if math.isNaN(groundYAveraged) or not cameraPos:closerToThan(cameraPosPrev, 100) then
+  if math.isnan(groundYAveraged) or not cameraPos:closerToThan(cameraPosPrev, 100) then
     groundYAveraged = groundY
   else
     groundYAveraged = math.applyLag(groundYAveraged, groundY, 0.995, dt)

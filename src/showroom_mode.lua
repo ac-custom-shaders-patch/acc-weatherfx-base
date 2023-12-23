@@ -40,6 +40,10 @@ ac.setSkyBrightnessMult(1)
 ac.setSkyV2YOffset(ac.SkyRegion.All, 0.1)
 ac.setSkyV2YScale(ac.SkyRegion.All, 0.9)
 
+if ac.getTrackID() == '../showroom/at_previews' then
+  ac.setSkyV2Saturation(ac.SkyRegion.All, 0.5)
+end
+
 -- Disable fog
 ac.setFogColor(rgb())
 ac.setFogExponent(1)

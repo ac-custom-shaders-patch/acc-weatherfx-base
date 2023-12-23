@@ -87,7 +87,7 @@ function RunGC()
   collectgarbage()
   gcSmooth = math.applyLag(gcSmooth, before - collectgarbage('count'), gcRuns < 50 and 0.9 or 0.995, 0.01)
   gcRuns = gcRuns + 1
-  ac.debug('GC', math.floor(gcSmooth * 100) / 100 .. " KB")
+  ac.debug('GC (KB)', gcSmooth)
 end
 
 -- Properly randomize random generator

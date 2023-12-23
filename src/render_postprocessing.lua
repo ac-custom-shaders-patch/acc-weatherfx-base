@@ -200,6 +200,15 @@ local sim = ac.getSim()
 ac.onPostProcessing(function (params, exposure, mainPass, updateExponent, rtSize)
   local data = table.getOrCreate(buffersCache, (mainPass and 0 or 1e7) + rtSize.y * 10000 + rtSize.x, createPPData, rtSize)
 
+  if sim.isPreviewsGenerationMode then
+    params.autoExposureEnabled = false
+    params.godraysEnabled = false
+    params.chromaticAberrationEnabled = false
+    params.dofActive = false
+    params.lensDistortionEnabled = false
+    params.vignetteStrength = 0
+  end
+
   local finalExposure = params.tonemapExposure
   if params.autoExposureEnabled then
     if updateExponent and mainPass then
@@ -321,7 +330,8 @@ ac.onPostProcessing(function (params, exposure, mainPass, updateExponent, rtSize
     data.pass2Params.values.gLensDistortionSmoothness = 1 / (0.01 + params.lensDistortionSmoothness)
   end
 
-  local useSunRays = mainPass and params.godraysEnabled and params.godraysInCameraFustrum and params.godraysColor:value() > 1
+  local useSunRays = mainPass and params.godraysEnabled and params.godraysInCameraFustrum 
+    and params.godraysColor:value() > 1 and not sim.isTripleFSRActive
   if data.pass2Params.defines.USE_SUN_RAYS ~= useSunRays then
     data.pass2Params.defines.USE_SUN_RAYS = useSunRays
     data.pass2Params.cacheKey = bit.bor(bit.band(data.pass2Params.cacheKey, bit.bnot(2048)), useSunRays and 2048 or 0)
@@ -348,7 +358,7 @@ ac.onPostProcessing(function (params, exposure, mainPass, updateExponent, rtSize
     data.pass2Params.values.gChromaticAberrationUniform:set(params.chromaticAberrationUniformDisplacement):div(rtSize):scale(100)
   end
 
-  local useFilmGrain = ScriptSettings.FILM_GRAIN and sim.cameraMode ~= ac.CameraMode.Cockpit
+  local useFilmGrain = ScriptSettings.FILM_GRAIN and sim.cameraMode ~= ac.CameraMode.Cockpit and not sim.isPreviewsGenerationMode
   if data.pass2Params.defines.USE_FILM_GRAIN ~= useFilmGrain then
     data.pass2Params.defines.USE_FILM_GRAIN = useFilmGrain
     data.pass2Params.cacheKey = bit.bor(bit.band(data.pass2Params.cacheKey, bit.bnot(8192)), useFilmGrain and 8192 or 0)

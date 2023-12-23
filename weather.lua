@@ -12,16 +12,25 @@
 ---@type fun()[]
 OnResolutionChange = {}
 
-local sim = ac.getSim()
-if sim.isShowroomMode or sim.isPreviewsGenerationMode then
-  require 'src/showroom_mode'
-  return
-end
+-- Global weather values
+NightK = 0 -- 1 at nights, 0 during the day
+SunDir = vec3(0, 1, 0)
+MoonDir = vec3(0, 1, 0)
+GodraysColor = rgb()
+CityHaze = 0
+FinalFog = 0
 
 ScriptSettings = ac.INIConfig.scriptSettings():mapSection('POSTPROCESSING', {
   LIGHTWEIGHT_REPLACEMENT = false,
   FILM_GRAIN = false
 })
+
+local sim = ac.getSim()
+if sim.isShowroomMode or sim.isPreviewsGenerationMode then
+  require 'src/showroom_mode'
+  require 'src/render_postprocessing'
+  return
+end
 
 require 'src/consts'                -- some general constant values
 require 'src/utils'                 -- helpful functions
@@ -110,6 +119,7 @@ end
 
 local lastSunDir = vec3()
 local lastCameraPos = vec3()
+local currentSunDir = vec3()
 local lastGameTime = 0
 local ruBase = RareUpdate:new{ callback = rareUpdate1 }
 local ruCloudMaterials = RareUpdate:new{ callback = rareUpdate2, phase = 1 }
@@ -132,8 +142,8 @@ function script.update(dt)
   local cloudsDT = TimelapsyCloudSpeed and getCloudsDeltaT(dt, gameDT) or gameDT
 
   -- If sun moved too much, have to force update
-  local currentSunDir = ac.getSunDirection()
-  local currentCameraPos = ac.getCameraPosition()
+  ac.getSunDirectionTo(currentSunDir)
+  local currentCameraPos = sim.cameraPosition
   local forceUpdate = math.dot(lastSunDir, currentSunDir) < 0.999995 or math.squaredDistance(currentCameraPos, lastCameraPos) > 10
   if forceUpdate then
     lastSunDir:set(currentSunDir)
