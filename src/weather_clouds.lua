@@ -5,6 +5,7 @@
 --------
 
 -- Local state (will be updated with values from `conditions_converter.lua`)
+local ccClouds = 0
 local windDir = vec2(1, 0)
 local windSpeed = 0
 local windAngle = 0
@@ -131,14 +132,14 @@ function CloudsCell:updateHovering(cameraPos, cellDistance, dt)
     c.position:set(e.pos):sub(cameraPos)
 
     local d = math.horizontalLength(c.position)
-    c.opacity = e.opacity * (1 - math.saturateN(e.visibilityOffset * d * 5 / (cellDistance * CloudCellSize) - 4)) * (1 - 0.2 * CurrentConditions.clouds)
+    c.opacity = e.opacity * (1 - math.saturateN(e.visibilityOffset * d * 5 / (cellDistance * CloudCellSize) - 4)) * (1 - 0.2 * ccClouds) * CloudsMult
 
     if c.opacity > 0.001 then
-      local weatherCutoff = 1 - math.lerpInvSat(CurrentConditions.clouds, e.weatherThreshold0, e.weatherThreshold1)
+      local weatherCutoff = 1 - math.lerpInvSat(ccClouds, e.weatherThreshold0, e.weatherThreshold1)
       if not c.passedFrustumTest then 
         c.orderBy = math.dot(c.position, c.position) + 1e9
       end
-      c.opacity = c.opacity * (0.5 + 0.5 * CurrentConditions.clouds) * (1 - weatherCutoff)
+      c.opacity = c.opacity * (0.5 + 0.5 * ccClouds) * (1 - weatherCutoff)
       c.extraFidelity = math.lerp(c.extras.extraFidelity, -2, nightEarlyK)
       c.horizontalHeading = transitionHeadingAngle(c.horizontalHeading, windAngle, dt)
 
@@ -165,7 +166,6 @@ function CloudsCell:updateDynamic(cameraPos, cellDistance, dt)
   local shapeShiftingDelta = dt * CloudShapeShiftingSpeed
   -- local maxDistanceInv = 5 / (cellDistance * CloudCellSize)
   local fadeNearbyInv = 500 / CloudFadeNearby
-  local ccClouds = CurrentConditions.clouds
   -- local opacityMult = 1 - 0.2 * ccClouds
   local opacityMult = 1
   local extraThick = math.lerpInvSat(CurrentConditions.clear, 1, 0.5)
@@ -173,7 +173,7 @@ function CloudsCell:updateDynamic(cameraPos, cellDistance, dt)
   local cloudsHeight = math.lerp(1, 0.5, CurrentConditions.cloudsDensity)
   local mapYMult = math.lerp(1, 1.2, nightEarlyK)
   local procScaleMult = math.lerp(1, 0.8, nightEarlySmoothK)
-  local distMult = 1 / (math.lerp(4, 0.5, math.max(math.pow(ccClouds - CurrentConditions.cloudsDensity, 8), NightK * 0.8)) * cellDistance * CloudCellSize)
+  local distMult = 1 / (math.lerp(4, 0.5, math.max(math.pow(ccClouds * (1 - CurrentConditions.clear) - CurrentConditions.cloudsDensity, 8), NightK * 0.8)) * cellDistance * CloudCellSize)
 
   for i = 1, self.cloudsCount do
     local e = self.clouds[i]
@@ -303,6 +303,13 @@ function CloudsCell:deactivate()
       e.flatCloudAdded = false
     end
   end
+  for i = 1, self.hoveringCloudsCount do
+    local e = self.hoveringClouds[i]
+    if e.cloudAdded then
+      e.cloudAdded = false
+      ac.weatherClouds:erase(e.cloud)
+    end
+  end
 end
 function CloudsCell:destroy()
   for i = 1, self.cloudsCount do
@@ -354,7 +361,7 @@ local cameraPos = vec3()
 local cleanUp = 0
 
 local function updateCloudCells(dt)
-  if CurrentConditions.clouds <= 0.0001 and (cellsPoolTotal > 1 or cellsTotal > 1) then 
+  if ccClouds <= 0.0001 and (cellsPoolTotal > 1 or cellsTotal > 1) then 
     if activeIndex >= 0 then
       activeIndex = -1
 
@@ -423,22 +430,22 @@ local function addStaticCloud(cloud)
   ac.weatherClouds[#ac.weatherClouds + 1] = cloud
 end
 local function updateStaticClouds(dt)
-  local cutoff = math.max(math.saturate(0.9 - CurrentConditions.clouds * 1.5),
-    math.lerpInvSat(CurrentConditions.clouds, 0.6, 0.9)) ^ 2
+  local cutoff = math.max(math.saturateN(1 - ccClouds * 1.5),
+    math.lerpInvSat(ccClouds, 0.6, 0.9)) ^ 2
   cutoff = math.lerp(cutoff, 1, NightK)
   -- cutoff = 1
   local lightPollution = GetRemoteLightPollution()
   local dtLocal = math.min(dt, 0.05)
-  local procMapLerp = math.max(0, CurrentConditions.clouds - 0.5)
+  local procMapLerp = math.max(0, ccClouds - 0.5)
   for i = 1, staticCloudsCount do
     local c = staticClouds[i]
     local withWind = math.dot(vec2(c.side.x, c.side.z), windDir)
-    c.noiseOffset.x = c.noiseOffset.x + (0.2 + math.saturate(windSpeed / 100)) * 0.002 * dtLocal * withWind
-    c.procShapeShifting = c.procShapeShifting + (1 + math.saturate(windSpeed / 100) * (1 - withWind)) * 0.002 * dtLocal
+    c.noiseOffset.x = c.noiseOffset.x + (0.2 + math.saturateN(windSpeed / 100)) * 0.002 * dtLocal * withWind
+    c.procShapeShifting = c.procShapeShifting + (1 + math.saturateN(windSpeed / 100) * (1 - withWind)) * 0.002 * dtLocal
     c.extraDownlit:set(lightPollution)
     c.extras.randomOffset = c.extras.randomOffset + dt * 0.1
     c.cutoff = cutoff + math.sin(c.extras.randomOffset) * 0.2 + math.sin(-c.extras.randomOffset * 0.271) * 0.1
-    c.opacity = c.extras.opacity
+    c.opacity = c.extras.opacity * CloudsMult
     c.procMap.y = math.lerp(c.extras.procMap.y, c.extras.procMap.x, procMapLerp)
   end
 end
@@ -455,7 +462,9 @@ end
 function UpdateClouds(dt)
   windDir = CurrentConditions.windDir
   windSpeed = CurrentConditions.windSpeed * 4 -- clouds move faster up there
+    + math.perlin(Sim.timestamp / 1.03e5, 3) * 20 -- and a bit of randomization to keep the clouds moving
   windAngle = math.atan2(windDir.y, -windDir.x) * 180 / math.pi
+  ccClouds = math.lerp(Sim.weatherConditions.humidity * 0.02, 1, CurrentConditions.clouds * CloudsMult)
 
   nightEarlyK = math.smoothstep(math.lerpInvSat(SunDir.y, 0.3, -0.05))
   nightEarlySmoothK = nightEarlySmoothK == -1 and nightEarlyK or math.applyLag(nightEarlySmoothK, nightEarlyK, 0.99, ac.getSim().dt)

@@ -5,12 +5,17 @@ float4 main(PS_IN pin) {
   // Turning that depth value in world coordinates in meters (relative to camera position):
   float4 posW = mul(float4(pin.Tex, depthValue, 1), gTexToCamera);
   posW.xyz /= posW.w;
+  pin.PosC = posW;
 
   // Vertical offset is based on relative coordinate, but gets smaller with distance to avoid messing up distant relief
   float offset = posW.y / (1 + max(0, length(posW.xz) - 100) / 500);
 
   // Turning vertical offset to a nice intensity gradient with smoothstep:
   float intensity = gIntensity * smoothstep(0, 1, saturate((offset - 40) / 40));
+
+  if (USE_LINEAR_COLOR_SPACE) {
+    intensity = toLinearColorSpace(intensity);
+  }
 
   // If argument for clip is below zero, blending stage will be skipped, slightly improving performance:
   clip(depthValue == 1 

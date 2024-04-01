@@ -30,7 +30,6 @@
 ]]
 
 local texData = {}
-local auroraIntensity = 0
 local auroraAmbientColor = rgb(0.3, 1, 0)
 local auroraTime = -math.random() * 1e6
 local temporalSmoothing = 0.05
@@ -136,7 +135,8 @@ local function renderAurora(passID, frameIndex, uniqueKey)
       ['txHigh.1'] = tex.txHighBlurred[1],
     },
     values = {
-      gBrightnessMult = auroraIntensity * (passID == render.PassID.CubeMap and 1.6 or 1)
+      gBrightnessMult = AuroraIntensity * (passID == render.PassID.CubeMap and 1.6 or 1) * (UseGammaFix and GammaFixBrightnessOffset * 3 or 1),
+      gGammaFix = UseGammaFix and 1 or 0, -- TODO
     },
     shader = 'shaders/aurora_apply.fx',
     cacheKey = 0
@@ -224,18 +224,19 @@ function UpdateAurora(dt)
     prevHour = curHour
   end
 
-  if chance == 0 then
+  if chance == 0 and (Overrides.aurora or 0) <= 0 then
     if subscribed then setAuroraActive(false) end
     return
   end
 
   auroraTime = auroraTime + dt
   temporalSmoothing = os.preciseClock() < 0.3 and 0.5 or (dt < 0.5 and (dt < 0.05 and 0.05 or 0.1) or 0.5)
-  auroraIntensity = computeAuroraIntensity(chance)
-  setAuroraActive(auroraIntensity > 0)
+  AuroraIntensity = Overrides.aurora or computeAuroraIntensity(chance)
+  AuroraIntensity = AuroraIntensity * (1 - SpaceLook)
+  setAuroraActive(AuroraIntensity > 0)
 
   if subscribed and auroraGlow then
     local noise = math.sin(auroraTime * 0.1) * 0.45 + math.sin(auroraTime * 0.713) * 0.3 + math.sin(auroraTime * 1.303) * 0.25
-    auroraGlow.color:set(auroraAmbientColor):scale(0.15 * (1 + 0.3 * noise) * auroraIntensity)
+    auroraGlow.color:set(auroraAmbientColor):scale((1 + 0.3 * noise) * AuroraIntensity * (UseGammaFix and 0.001 or 0.15))
   end
 end

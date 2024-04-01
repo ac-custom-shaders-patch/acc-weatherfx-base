@@ -1,35 +1,128 @@
 --------
 -- Basic WeatherFX implementation, this is the main file. Sets things up, includes a bunch of stuff and triggers updates.
 --------
--- Please note: some of its parts work with vectors and colors. CSP defines its types for it, such as `vec3()` and `rgb()`.
--- The thing is though, each time a new vector, for example, is created, it’ll have to be picked by garbage collector
--- later. So to try and make it run as fast as possible, I tried to avoid creating new copies of vectors and instead
--- using functions like `ac.calculateSkyColorTo(value)` instead of `value = ac.calculateSkyColor()`. If you would want
--- to fork this script and make your own version of it, of course, feel free to use a more readable approach.
---------
 
 ---Functions from this list will be called when resolution changes.
 ---@type fun()[]
 OnResolutionChange = {}
 
+---TODO: Remove once gamma becomes non-changing live.
+---@type fun()[]
+OnGammaFixChange = {}
+
+ScriptSettings = ac.INIConfig.scriptSettings():mapConfig({
+  LINEAR_COLOR_SPACE = {
+    ENABLED = false,
+    DIM_EMISSIVES = true,
+    DEV_MODE = false
+  },
+  POSTPROCESSING = {
+    LIGHTWEIGHT_REPLACEMENT = false,
+    FILM_GRAIN = false
+  }
+})
+
 -- Global weather values
 NightK = 0 -- 1 at nights, 0 during the day
+AuroraIntensity = 0
 SunDir = vec3(0, 1, 0)
 MoonDir = vec3(0, 1, 0)
 GodraysColor = rgb()
 CityHaze = 0
 FinalFog = 0
+SpaceLook = 0 -- turns from 0 to 1 as camera gets higher switching to space look of the Earth
+CloudsMult = 0 -- turns to 0 at 4 km to hide clouds
+EclipseFullK = 0 -- starts growing when moon covers sun fully blocking the light, 1 at total eclipse, used for heavy darkening of sky and sun light
+ForceRapidUpdates = 0
+BrightnessMultApplied = 0
+GroundYAveraged = math.nan
+Sim = ac.getSim()
 
-ScriptSettings = ac.INIConfig.scriptSettings():mapSection('POSTPROCESSING', {
-  LIGHTWEIGHT_REPLACEMENT = false,
-  FILM_GRAIN = false
-})
-
-local sim = ac.getSim()
-if sim.isShowroomMode or sim.isPreviewsGenerationMode then
+if Sim.isShowroomMode or Sim.isPreviewsGenerationMode then
+  ScriptSettings.LINEAR_COLOR_SPACE.ENABLED = false
   require 'src/showroom_mode'
   require 'src/render_postprocessing'
   return
+end
+
+if Sim.isOnlineRace then
+  ScriptSettings.LINEAR_COLOR_SPACE.DEV_MODE = false
+elseif ScriptSettings.LINEAR_COLOR_SPACE.DEV_MODE then
+  ui.onExclusiveHUD(function ()
+    ui.drawText(UseGammaFix and '[ Linear color space ]' or '[ Gamma color space ]', vec2(8, 8))
+  end)
+end
+
+Overrides = {gamma = ScriptSettings.LINEAR_COLOR_SPACE.ENABLED}
+if ScriptSettings.LINEAR_COLOR_SPACE.DEV_MODE then
+  ui.addSettings({icon = ui.Icons.WeatherFewClouds, name = 'WeatherFX style', onOpen = function ()
+    Overrides = stringify.tryParse(ac.storage.overrides) or {}
+    ForceRapidUpdates = ForceRapidUpdates + 1
+  end, onClose = function ()
+    Overrides = {gamma = ScriptSettings.LINEAR_COLOR_SPACE.ENABLED}
+    ForceRapidUpdates = ForceRapidUpdates - 1
+  end}, function ()
+    if not Overrides.tint then
+      Overrides.tint = rgb.colors.white
+    end
+
+    ui.beginGroup(-0.1)
+    ui.pushItemWidth(-0.1)
+    ui.pushFont(ui.Font.Small)
+    if ui.checkbox('Linear color space', Overrides.gamma) then
+      Overrides.gamma = not Overrides.gamma
+      BrightnessMultApplied = -1
+    end
+
+    if ScriptSettings.POSTPROCESSING.LIGHTWEIGHT_REPLACEMENT then
+      if ui.checkbox('Original YEBIS post-processing', Overrides.originalPostProcessing) then
+        Overrides.originalPostProcessing = not Overrides.originalPostProcessing
+      end
+    end
+
+    GammaFixBrightnessOffset = ui.slider('##gfbo', GammaFixBrightnessOffset, 1e-6, 10, 'Brightness offset: %.6f', 10)
+    GammaFixLightsDivisor = ui.slider('##gfld', GammaFixLightsDivisor, 1e-3, 1e4, 'Lights divisor: %.6f', 10)
+    if ui.itemEdited() and UseGammaFix then
+      ac.useLinearColorSpace(true, GammaFixLightsDivisor)
+    end
+
+    ui.offsetCursorY(12)
+    ui.header('Conditions override')
+    Overrides.clear = ui.slider('##clear', Overrides.clear or 1, 0, 1, 'Clear: %.3f')
+    Overrides.fog = ui.slider('##fog', Overrides.fog or 0, 0, 1, 'Fog: %.3f')
+    Overrides.clouds = ui.slider('##clouds', Overrides.clouds or 0, 0, 1, 'Clouds: %.3f')
+    Overrides.cloudsDensity = ui.slider('##cloudsDensity', Overrides.cloudsDensity or 0, 0, 1, 'Clouds density: %.3f')
+    Overrides.thunder = ui.slider('##thunder', Overrides.thunder or 0, 0, 1, 'Thunder %.3f')
+    Overrides.pollution = ui.slider('##pollution', Overrides.pollution or 0, 0, 1, 'Pollution: %.3f')
+    Overrides.aurora = ui.slider('##aurora', Overrides.aurora or 0, 0, 1, 'Aurora: %.3f')
+
+    ui.offsetCursorY(12)
+    ui.header('Rain')
+    Overrides.rain = ui.slider('##rain', Overrides.rain or 0, 0, 1, 'Rain: %.3f')
+    Overrides.wetness = ui.slider('##wetness', Overrides.wetness or 0, 0, 1, 'Wetness: %.3f')
+    Overrides.water = ui.slider('##water', Overrides.water or 0, 0, 1, 'Water: %.3f')
+    Overrides.rainbowIntensity = ui.slider('##rainbowIntensity', Overrides.rainbowIntensity or 0, 0, 1, 'Rainbow: %.3f')
+
+    ui.offsetCursorY(12)
+    ui.header('Mood')
+    Overrides.saturation = ui.slider('##saturation', Overrides.saturation or 1, 0, 2, 'Saturation: %.3f')
+
+    ui.alignTextToFramePadding()
+    ui.text('Tint:')
+    ui.sameLine(80)
+    ui.colorButton('##tint', Overrides.tint, ui.ColorPickerFlags.PickerHueWheel)
+
+    ui.offsetCursorY(12)
+    ui.header('Light pollution')
+    Overrides.lightPollution = ui.slider('##lightPollution', Overrides.lightPollution or 0, 0, 3, 'Density: %.3f', 2)
+    ui.popItemWidth()
+    ui.endGroup()
+    ui.popFont()
+    if ui.itemEdited() then
+      ac.storage.overrides = stringify(Overrides, true)
+      BrightnessMultApplied = -1
+    end
+  end)
 end
 
 require 'src/consts'                -- some general constant values
@@ -43,6 +136,8 @@ require 'src/render'                -- render core
 require 'src/render_aurora'         -- extra effect: aurora
 require 'src/render_rain'           -- extra effect: rain haze
 require 'src/render_fog'            -- extra effect: fog covering tops of high buildings in foggy conditions
+require 'src/render_eclipse'        -- glare around sun during eclipse
+require 'src/render_lightning'      -- simple bolt-like visual for lightnings
 
 -- Use asyncronous textures loading for faster loading
 ac.setAsyncTextureLoading(true)
@@ -65,9 +160,10 @@ ac.generateCloudMap(cloudMap)
 -- Loading textures for sky stuff
 ac.setSkyStarsMap('textures/weather_fx/starmap.dds')
 ac.setSkyMoonTexture('textures/weather_fx/moon.dds')
+ac.setEarthTexture('textures/weather_fx/earth.dds')
 ac.setSkyMoonGradient(0)
 
--- UPD: Have to use original size for moon eclipse to look properly:
+-- Have to use original size for moon eclipse to look properly:
 ac.setSkySunMoonSizeMultiplier(1)
 ac.setMoonEclipse(true)
 
@@ -83,6 +179,7 @@ ac.setCloudShadowScalingFactor(1)
 
 -- Use v2 sky shader
 ac.setSkyUseV2(true)
+ac.setSkyMoonClipThreshold(0.9)
 ac.setCloudArcMultiplier(1)
 
 -- Use new fog formula (instead of original AC one)
@@ -100,7 +197,7 @@ ac.setLambertGamma(UseLambertGammaFix and 1 / 2.2 or 1)
 -- Called each 3rd frame or if sun moved
 local function rareUpdate1(dt)
   ReadConditions(dt)
-  ApplySky()
+  ApplySky(dt)
   ApplyLight() 
   ApplyAmbient()
   ApplyFog(dt)
@@ -114,7 +211,7 @@ local function rareUpdate2(dt)
   UpdateLightPollution()
   UpdateCloudMaterials()
   UpdateAurora(dt)
-  UpdateAboveFog(dt)
+  -- UpdateAboveFog(dt)
 end
 
 local lastSunDir = vec3()
@@ -133,27 +230,94 @@ local function getCloudsDeltaT(dt, gameDT)
   return dt * math.sign(cloudsDeltaTime) * math.lerp(1, ratio, 0.4)
 end
 
+-- local function wfxGammaFixCompatibilityLayer(active)
+--   if not _G._wfxclb then
+--     _G._wfxclb = table.clone(ac, false)
+--   end
+--   if active then
+--     ac.setLightColor = function (v) _G._wfxclb.setLightColor(v ^ 2.2) end
+--     ac.setSpecularColor = function (v) _G._wfxclb.setSpecularColor(v ^ 2.2) end
+--     ac.setAmbientColor = function (v) _G._wfxclb.setAmbientColor(v ^ 2.2) end
+--     ac.setBaseAmbientColor = function (v) _G._wfxclb.setBaseAmbientColor(v ^ 2.2) end
+--     ac.setDistantAmbientColor = function (v, a) _G._wfxclb.setDistantAmbientColor(v ^ 2.2, a) end
+--     ac.setExtraAmbientColor = function (v) _G._wfxclb.setExtraAmbientColor(v ^ 2.2) end
+--     ac.setFogExponent = function (v) _G._wfxclb.setFogExponent(v * 2.2) end
+--     ac.setFogColor = function (v) _G._wfxclb.setFogColor(v ^ 2.2) end
+--     ac.setSkyStarsExponent = function (v) _G._wfxclb.setSkyStarsExponent(v * 2.2) end
+--   else
+--     for k, v in pairs(_G._wfxclb) do
+--       ac[k] = v
+--     end
+--   end
+-- end
+
+local forceUpdateShadingNext = false
+local keepForceUpdates = 1
+
 function script.update(dt)
+  local curGammaFix = Overrides.gamma ~= false
+  if UseGammaFix ~= curGammaFix then
+    InitializeConsts(curGammaFix)
+    OnGammaToggle()
+    ForceRapidUpdates = ForceRapidUpdates + 1
+    setTimeout(function ()
+      ForceRapidUpdates = ForceRapidUpdates - 1
+    end, 0.1)
+  end
+
+  -- ac.debug('localVelocity', ac.getCar(0).localVelocity)
+  -- ac.debug('localAngularVelocity', ac.getCar(0).localAngularVelocity)
+  -- ac.debug('angularVelocity', ac.getCar(0).angularVelocity)
+  -- ac.debug('velocity', ac.getCar(0).velocity)
+  -- ac.debug('acceleration', ac.getCar(0).acceleration)
+
   -- This value is time passed in seconds (as dt), but taking into account pause, slow
   -- motion or fast forward, but not time scale in conditions
-  local gameDT = sim.dt
+  local gameDT = Sim.dt
 
   -- Clouds operate on actual passed time
   local cloudsDT = TimelapsyCloudSpeed and getCloudsDeltaT(dt, gameDT) or gameDT
 
   -- If sun moved too much, have to force update
   ac.getSunDirectionTo(currentSunDir)
-  local currentCameraPos = sim.cameraPosition
-  local forceUpdate = math.dot(lastSunDir, currentSunDir) < 0.999995 or math.squaredDistance(currentCameraPos, lastCameraPos) > 10
+  local currentCameraPos = Sim.cameraPosition
+  local cameraOffset = math.squaredDistance(currentCameraPos, lastCameraPos)
+  if math.dot(lastSunDir, currentSunDir) < 0.999995 or cameraOffset > 10 then
+    keepForceUpdates = 1
+  end
+  local forceUpdate = ForceRapidUpdates > 0
+  if keepForceUpdates > 0 then
+    forceUpdate = true
+    keepForceUpdates = keepForceUpdates - dt
+  end
   if forceUpdate then
     lastSunDir:set(currentSunDir)
+    ForceRapidUpdates = ForceRapidUpdates + 1
   end
 
   lastCameraPos:set(currentCameraPos)
 
+  local groundY = ac.getGroundYApproximation()
+  if math.isnan(GroundYAveraged) or cameraOffset > 50 * 50 then
+    GroundYAveraged = groundY
+  else
+    GroundYAveraged = math.applyLag(GroundYAveraged, groundY, 0.995, dt)
+  end
+
+  local forceUpdateShading = forceUpdate
+  if forceUpdateShadingNext then
+    forceUpdateShading = true
+    forceUpdateShadingNext = false
+  end
+
+  -- Thunder effect: a small extra gradient glowing in sky
+  if ApplyThunder(gameDT) then
+    forceUpdateShading = true
+  end
+
   -- Actual update will happen only once in three frames, or if forceUpdate is true
-  ruBase:update(gameDT, forceUpdate)
-  ruCloudMaterials:update(cloudsDT, forceUpdate)
+  ruBase:update(gameDT, forceUpdateShading)
+  ruCloudMaterials:update(cloudsDT, forceUpdateShading)
 
   -- Increasing refresh rate for faster moving clouds
   if math.abs(cloudsDT) > 0.5 then 
@@ -161,7 +325,7 @@ function script.update(dt)
     ac.invalidateCloudReflections()
   elseif math.abs(cloudsDT) > 0.05 then 
     ruClouds.skip = 1
-    if sim.frame % 4 == 0 then      
+    if Sim.frame % 4 == 0 then      
       ac.invalidateCloudReflections()
     end
   elseif math.abs(cloudsDT) < 0.03 then 
@@ -173,9 +337,9 @@ function script.update(dt)
   -- Fake exposure aka eye adaptation needs to update each frame, with speed independant 
   -- from pause, slow motion and what not
   ApplyFakeExposure(dt)
-
-  -- Thunder effect: a small extra gradient glowing in sky
-  ApplyThunder(gameDT)
+  if ApplyFakeExposure_postponed() then
+    forceUpdateShadingNext = true
+  end
 
   -- Rain haze: some sort of volumetric-like effect for distant rain
   UpdateRainHaze(gameDT)
@@ -184,8 +348,12 @@ function script.update(dt)
   -- RunGC()
 end
 
-if ScriptSettings.LIGHTWEIGHT_REPLACEMENT then
+if ScriptSettings.POSTPROCESSING.LIGHTWEIGHT_REPLACEMENT then
   require 'src/render_postprocessing'
+elseif ScriptSettings.LINEAR_COLOR_SPACE.ENABLED or ScriptSettings.LINEAR_COLOR_SPACE.DEV_MODE then
+  -- WeatherFX can convert linear to sRGB automatically, but it wouldn’t take our GammaFixBrightnessOffset into
+  -- account, and will just use the basic `pow(X, 1/2.2)` conversion too.
+  require 'src/render_linear'
 end
 
 function script.frameBegin(dt)

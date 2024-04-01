@@ -87,7 +87,7 @@ function CloudTypes.Dynamic(cloud, pos)
   cloudutils.setPos(cloud, { 
     pos = pos, 
     size = cloudSize, 
-    procScale = math.lerp(0.8, 1.2, fidelityRandom) / cloudSize
+    procScale = math.lerp(1.6, 1.2, fidelityRandom) / cloudSize
   })
 
   cloud.extras.procMap = cloud.procMap:clone()
@@ -113,7 +113,7 @@ function CloudTypes.Bottom(cloud, mainCloud)
 end
 function CloudTypes.Hovering(cloud, pos)
   cloudutils.setTexture(cloud, CloudTextures.Hovering)
-  cloud.procMap = vec2(0.8, 0.9) + math.random() * 0.15
+  cloud.procMap = vec2(0.5, 0.9) + math.random() * 0.15
   cloud.procSharpnessMult = 0
   cloud.extraFidelity = 0.6
   cloudutils.setProcNormalShare(cloud, 0.2, 2)
@@ -126,6 +126,7 @@ function CloudTypes.Hovering(cloud, pos)
   cloud.horizontalHeading = -1
   cloud.material = CloudMaterials.Hovering
   cloud.extras.extraFidelity = cloud.extraFidelity
+  cloud.opacity = cloud.opacity * 0.5
 end
 function CloudTypes.Spread(cloud, pos)
   cloudutils.setTexture(cloud, CloudTextures.Spread)

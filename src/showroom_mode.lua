@@ -32,10 +32,10 @@ ac.setSkyV2SunIntensityFalloffSteepness(ac.SkyRegion.All, 1.5)
 
 ac.setSkyV2BackgroundLight(ac.SkyRegion.All, 0.0)
 ac.setSkyV2Luminance(ac.SkyRegion.All, 0.3)
-ac.setSkyV2Gamma(ac.SkyRegion.All, 2.5)
 ac.setSkyV2SunShapeMult(ac.SkyRegion.All, 10)
 ac.setSkyV2SunSaturation(ac.SkyRegion.All, 0.9)
 ac.setSkyV2Saturation(ac.SkyRegion.All, 1)
+ac.setSkyV2Gamma(ac.SkyRegion.All, 2.5)
 ac.setSkyBrightnessMult(1)
 ac.setSkyV2YOffset(ac.SkyRegion.All, 0.1)
 ac.setSkyV2YScale(ac.SkyRegion.All, 0.9)
@@ -82,6 +82,14 @@ ac.setEmissiveMultiplier(1)
 ac.setWeatherTrackLightsMultiplierThreshold(0)
 ac.setReflectionEmissiveBoost(1)
 ac.setReflectionsBrightness(1)
+
+if ScriptSettings.LINEAR_COLOR_SPACE.ENABLED then
+  UseGammaFix = true
+  GammaFixBrightnessOffset = 1
+  ac.useLinearColorSpace(true, 100)
+  ac.setBrightnessMult(GammaFixBrightnessOffset * 0.015)
+  ac.setSkyV2Gamma(ac.SkyRegion.All, 1)
+end
 
 -- Optional override
 local weather = ac.connect({

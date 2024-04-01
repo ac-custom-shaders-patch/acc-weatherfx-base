@@ -8,9 +8,11 @@
 -- Global light pollution values
 LightPollutionValue = 0
 LightPollutionSkyFeaturesMult = 1
+LightPollutionColor = rgb()
 
 -- Read light pollution
 local lightPolData = ac.getTrackLightPollution()
+lightPolData.tint:clamp(rgb.colors.black, rgb.colors.white)
 
 -- Light pollution relative to camera
 local lightPolPos = vec3()
@@ -55,6 +57,7 @@ local cameraPosition = vec3()
 
 -- Update light pollution position, gradient, global variables
 function UpdateLightPollution()  
+  lightPolData.density = Overrides.lightPollution or lightPolData.density
   ac.getCameraPositionTo(cameraPosition)
 
   -- Could use `lightPolPos = lightPolData.position - cameraPosition`, but this way, there is no
@@ -73,11 +76,15 @@ function UpdateLightPollution()
 
   -- If distance is the same or smaller than radius, it’ll be 1 (because of `math.saturate(…)` clamping result between 0 and 1),
   -- if distance is higher, it’ll slowly go down to zero
-  local distanceK = math.saturate(lightPolData.radius * polDistanceInv) 
+  local distanceK = math.saturateN(lightPolData.radius * polDistanceInv)
 
   -- Set gradient color: use pollution tint scaled by density and brightness in settings, plus multiplied by distance 
   -- coefficient in 0.25 power
-  lightPolGradient.color:set(lightPolData.tint):scale(lightPolData.density * (distanceK ^ 0.25) * polBrightness)
+  lightPolGradient.color:set(lightPolData.tint):scale(lightPolData.density ^ 2)
+  if UseGammaFix then
+    lightPolGradient.color:pow(2.2)
+  end
+  lightPolGradient.color:scale((distanceK ^ 0.25) * polBrightness)
 
   -- Calculating light pollution direction and size: for distant pollution (with lower distance coefficient),
   -- gradient will be at the direction towards the pollution, but direction to closer gradient moves down 
@@ -89,7 +96,9 @@ function UpdateLightPollution()
   lightPolDistanceK = distanceK
 
   -- Updating those public cached values
-  LightPollutionValue = lightPolData.density * distanceK
+  LightPollutionValue = math.saturateN(lightPolData.density * distanceK)
+  LightPollutionColor = lightPolGradient.color
   LightPollutionSkyFeaturesMult = 1 - LightPollutionValue * 0.9
   remoteLightPollution:set(lightPolData.tint):scale(distanceK * NightK * lightPolData.density * polBrightness)
+  -- ac.debug('LightPollutionValue', LightPollutionValue)
 end

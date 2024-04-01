@@ -31,6 +31,7 @@ local renderFogParams = {
 }
 
 local function renderFog()
+  ac.debug('renderFog', intensity)
   renderFogParams.values.gIntensity = intensity
   render.fullscreenPass(renderFogParams)
 end
@@ -41,6 +42,7 @@ local needsHighFogEffect = nil
 function UpdateAboveFog(dt)
   local cc = CurrentConditions
   intensity = math.lerpInvSat(FinalFog, 0.8, 1)
+  -- intensity = 1
   if intensity == 0 then
     if subscribed then
       subscribed()
@@ -54,6 +56,7 @@ function UpdateAboveFog(dt)
     local startingPoint = ac.getCar(0).pitTransform.position.y
     local _, aabbMax = ac.findMeshes('{ static:yes & alphaBlend:no & transparent:no & ! lodOut:0 & ! largerThan:500 }'):getStaticAABB()
     needsHighFogEffect = aabbMax.y - startingPoint > 100
+    -- needsHighFogEffect = true
   end
 
   if not subscribed and needsHighFogEffect then

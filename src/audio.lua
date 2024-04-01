@@ -198,7 +198,7 @@ local function updateRainAudio(rainAmount, rainWetness, rainWater, dt)
     end
 
     local slipAdjusted = wheel.ndSlip - wheel.waterThickness * 800
-    local targetVolume = wheel.surfaceGrip > 0.9 and not wheel.isBlown
+    local targetVolume = wheel.surfaceGrip > 0.9 and not wheel.isBlown and not wheel.isSpecialSurface
       and tonemap(slipAdjusted - 1) * math.lerpInvSat(car.speedKmh, 4, 40) * 0.4 or 0
     local newVolume = math.applyLag(rainSkidsExterior[i + 1].volume, targetVolume, 0.6, dt)
     rainSkidsExterior[i + 1].volume = newVolume

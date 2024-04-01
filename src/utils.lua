@@ -91,7 +91,7 @@ function RunGC()
 end
 
 -- Properly randomize random generator
-math.randomseed(os.time())
+math.randomseed(math.randomKey())
 
 -- Uncomment this line for debugging to get the same random values
--- math.randomseed(0)
+math.randomseed(0)
