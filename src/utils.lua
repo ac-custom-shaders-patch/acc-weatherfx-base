@@ -94,4 +94,5 @@ end
 math.randomseed(math.randomKey())
 
 -- Uncomment this line for debugging to get the same random values
-math.randomseed(0)
+-- math.randomseed(0)
+math.randomseed(2)

@@ -20,10 +20,11 @@ SceneBrightnessMultPP = 3  -- with post-processing active: brightness multiplier
 FilterBrightnessMultPP = 1.0 -- with post-processing active: brightness adjustment applied after auto-exposure
 
 function InitializeConsts(useGammaFix)
-  ac.broadcastSharedEvent('_dev.WeatherFX.GammaToggle')
   ac.useLinearColorSpace(useGammaFix, GammaFixLightsDivisor)
   ac.setWeatherLightsMultiplier(1)
   ac.setWeatherLightsMultiplier2(1)
+  ac.setWeatherLightsRangeFactor(useGammaFix and 1 or 0.5)
+  ac.setWeatherBouncedLightMultiplier(rgb.new(useGammaFix and 0.45 or 0.35))
   UseGammaFix = useGammaFix
 
   for _, v in ipairs(OnGammaFixChange) do v() end
@@ -38,6 +39,7 @@ function InitializeConsts(useGammaFix)
     SkyBrightness = 1
     
     AdaptationSpeed = 2
+    AdaptationSpeed = 10
     SunColor = rgb(1, 1, 1)
     MoonColor = rgb(1, 1.5, 2)
     LightPollutionBrightness = 0.002

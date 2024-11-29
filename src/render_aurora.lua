@@ -29,6 +29,11 @@
     own `uniqueKey`. For each of those keys new set of textures is prepared.
 ]]
 
+if not ScriptSettings.EXTRA_EFFECTS.AURORAS then
+  UpdateAurora = function (dt) end
+  return
+end
+
 local texData = {}
 local auroraAmbientColor = rgb(0.3, 1, 0)
 local auroraTime = -math.random() * 1e6
@@ -136,7 +141,6 @@ local function renderAurora(passID, frameIndex, uniqueKey)
     },
     values = {
       gBrightnessMult = AuroraIntensity * (passID == render.PassID.CubeMap and 1.6 or 1) * (UseGammaFix and GammaFixBrightnessOffset * 3 or 1),
-      gGammaFix = UseGammaFix and 1 or 0, -- TODO
     },
     shader = 'shaders/aurora_apply.fx',
     cacheKey = 0
@@ -156,7 +160,7 @@ local function setAuroraActive(active)
         auroraGlow.sizeStart = 1
         auroraGlow.exponent = 0.3
       end
-      subscribed = RenderSkySubscribe(render.PassID.All, renderAurora)
+      subscribed = RenderSkySubscribe(render.PassID.All, renderAurora, 1)
       ac.skyExtraGradients:push(auroraGlow)
     else
       ac.skyExtraGradients:erase(auroraGlow)

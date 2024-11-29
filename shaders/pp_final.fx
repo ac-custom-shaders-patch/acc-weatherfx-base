@@ -103,6 +103,10 @@ float4 main(PS_IN pin){
   #ifdef USE_GLARE
     float4 blur1 = txBlur1.SampleLevel(samLinearSimple, pin.Tex, 0);
     float4 blur2 = txBlur2.SampleLevel(samLinearSimple, pin.Tex, 0);
+    #ifdef USE_GLARE_CHROMATIC_ABERRATION
+      blur2.r = txBlur2.SampleLevel(samLinearClamp, pin.Tex + uvPos * 0.005, 0).r;
+      blur2.b = txBlur2.SampleLevel(samLinearClamp, pin.Tex - uvPos * 0.005, 0).b;
+    #endif
     float3 blurT = blur1.rgb + blur2.rgb * 3;
     col.rgb += pow(blurT, 2) * 0.1 * gGlareLuminance;
   #endif
@@ -151,11 +155,12 @@ float4 main(PS_IN pin){
   // if (dot(abs(col.rgb - float3(200, 100, 0)), 1) < 10) return float4(0, 0, 1, 1);
   // if (col.r > 180) return float4(0, 0, 1, 1);
 
-  float4 adj = mul(float4(col.rgb, 1), gMat);
+  float4 adj = mul(float4(col.rgb, 1), gMatHDR);
   col.rgb = max(0, adj.rgb / adj.w);
   col.rgb *= gExposure; 
   col.rgb = colorGrading(col.rgb);
   col.rgb = pow(max(col.rgb, 0), gGamma);
+  col.rgb = mul(float4(col.rgb, 1), gMatLDR).rgb;
 
   // col.rgb = float3(raysMask, 1 - raysMask, 0);
 

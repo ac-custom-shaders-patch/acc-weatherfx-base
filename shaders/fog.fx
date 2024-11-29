@@ -1,11 +1,11 @@
 float4 main(PS_IN pin) {
   // Reading depth value for current pixel of the scene:
-  float depthValue = txDepth.SampleLevel(samLinearSimple, pin.Tex, 0);
+  float depthValue = pin.GetDepth();
 
   // Turning that depth value in world coordinates in meters (relative to camera position):
   float4 posW = mul(float4(pin.Tex, depthValue, 1), gTexToCamera);
   posW.xyz /= posW.w;
-  pin.PosC = posW;
+  pin.PosC = normalize(posW.xyz) * 1e3;
 
   // Vertical offset is based on relative coordinate, but gets smaller with distance to avoid messing up distant relief
   float offset = posW.y / (1 + max(0, length(posW.xz) - 100) / 500);
@@ -14,13 +14,14 @@ float4 main(PS_IN pin) {
   float intensity = gIntensity * smoothstep(0, 1, saturate((offset - 40) / 40));
 
   if (USE_LINEAR_COLOR_SPACE) {
-    intensity = toLinearColorSpace(intensity);
+    intensity = toLinearColorSpace(intensity).r;
+    // If argument for clip is below zero, blending stage will be skipped, slightly improving performance:
+    clip(depthValue == 1 
+      ? -1                   // 1 for depthValue usually means it’s the sky
+      : intensity - 0.001);  // otherwise, we clip pixels that would be barely visible anyway
+  } else {    
+    clip(intensity - 0.001);
   }
-
-  // If argument for clip is below zero, blending stage will be skipped, slightly improving performance:
-  clip(depthValue == 1 
-    ? -1                   // 1 for depthValue usually means it’s the sky
-    : intensity - 0.001);  // otherwise, we clip pixels that would be barely visible anyway
 
   // Building resulting RGBA color:
   return float4(

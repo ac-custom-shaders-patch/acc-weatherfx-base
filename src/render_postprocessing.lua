@@ -21,12 +21,6 @@ table.insert(OnResolutionChange, function ()
   table.clear(buffersCache)
 end)
 
-table.insert(OnGammaFixChange, function ()
-  -- setTimeout(function ()
-  --   table.clear(buffersCache)
-  -- end, 0.5)
-end)
-
 ---@param resolution vec2
 local function createPPData(resolution)
   resolution = resolution:clone():scale(0.5)
@@ -133,7 +127,8 @@ local function createPPData(resolution)
         txColorGrading = 'dynamic::pp::colorGrading3D',
       },
       values = {
-        gMat = mat4x4(),
+        gMatHDR = mat4x4(),
+        gMatLDR = mat4x4(),
         gColorGrading = 0,
         gVignette = 0,
         gVignetteRatio = vec2(1, 1),
@@ -161,13 +156,14 @@ local function createPPData(resolution)
         USE_LENS_DISTORTION = false,
         USE_CHROMATIC_ABERRATION = false,
         USE_FILM_GRAIN = false,
+        USE_GLARE_CHROMATIC_ABERRATION = ScriptSettings.POSTPROCESSING.GLARE_CHROMATIC_ABERRATION
       },
       cacheKey = 0,
       directValuesExchange = true,
       shader = 'shaders/pp_final.fx'
     },
     useDof = false
-  }
+  } 
 end
 
 local aeMeasure1 = ui.ExtraCanvas(256, 8, render.TextureFormat.R16.Float)
@@ -175,6 +171,11 @@ local aeMeasure2 = ui.ExtraCanvas(vec2(4, 256), 8, render.TextureFormat.R16.Floa
 local aeMeasure3 = ui.ExtraCanvas(4, 4, render.TextureFormat.R16.Float)
 local aeMeasured = 0
 local aeCurrent = tonumber(ac.load('wfx.base.ae')) or 1
+if not math.isfinite(aeCurrent) then aeCurrent = 1 end
+
+table.insert(OnGammaFixChange, function ()
+  aeCurrent = 1
+end)
 
 local aePass1 = {
   textures = {
@@ -183,7 +184,7 @@ local aePass1 = {
   values = {
     gGammaFixBrightnessOffset = 1,
     gMappingFactor = 32,
-    gMappingData = vec2(),
+    gMappingData = vec4(),
     gAreaSize = vec2(),
     gAreaOffset = vec2(),
   },
@@ -282,6 +283,7 @@ local function configureAutoExposure(passParams, params, finalExposure, limited)
 end
 
 local finalExposure = 1
+local lastBrightnessMult = -1
 ac.onPostProcessing(function (params, exposure, mainPass, updateExponent, rtSize)
   if mainPass and ScriptSettings.LINEAR_COLOR_SPACE.DEV_MODE and Overrides.originalPostProcessing then
     if not UseGammaFix then
@@ -314,18 +316,24 @@ ac.onPostProcessing(function (params, exposure, mainPass, updateExponent, rtSize
       aeMeasure2:updateWithShader(aePass2)
       aeMeasure3:updateWithShader(aePass3)
       aeMeasure3:accessData(autoExposureDataCallback)
-      -- ac.debug('aeMeasured', aeMeasured)
-      -- ac.debug('aeTarget', params.autoExposureTarget * exposure)
       if aeMeasured > 0 then
-        local autoExposure = params.autoExposureTarget * exposure / aeMeasured
-        aeCurrent = math.applyLag(aeCurrent, autoExposure, 0.95, ac.getDeltaT())
+        local aeTarget = params.autoExposureTarget * exposure / aeMeasured
         if UseGammaFix then
-          aeCurrent = aeCurrent * (Sim.isFocusedOnInterior and 0.9 or 0.95)
+          -- TODO: Find a better way?
+          aeTarget = aeTarget * (Sim.isFocusedOnInterior and 0.35 or 0.6)
         end
+        aeTarget = math.clamp(aeTarget, params.autoExposureMin, params.autoExposureMax)
+        if lastBrightnessMult ~= -1 and BrightnessMultApplied > 0 then
+          aeCurrent = aeCurrent * lastBrightnessMult / BrightnessMultApplied
+        end
+        lastBrightnessMult = BrightnessMultApplied
+        aeCurrent = math.applyLag(aeCurrent, aeTarget, RecentlyJumped > 0 and 0 or 0.97, ac.getDeltaT())
         ac.store('wfx.base.ae', aeCurrent)
+        finalExposure = aeCurrent
+        -- ac.debug('aeTarget', aeTarget)
+        -- ac.debug('aeCurrent', aeCurrent)
       end
-      -- ac.debug('aeCurrent', aeCurrent)
-      finalExposure = math.clamp(aeCurrent, params.autoExposureMin, params.autoExposureMax)
+      -- ac.debug('finalExposure', finalExposure)
     else
       finalExposure = params.tonemapExposure
     end
@@ -375,8 +383,11 @@ ac.onPostProcessing(function (params, exposure, mainPass, updateExponent, rtSize
     data.dofOutput:updateWithShader(data.passDofProcess)
   end
 
-  data.pass2Params.values.gMat:set(ac.getPostProcessingHDRColorMatrix())
-  data.pass2Params.values.gMat:transposeSelf() -- with `directValuesExchange` we need to transpose matrices manually
+  data.pass2Params.values.gMatHDR:set(ac.getPostProcessingHDRColorMatrix())
+  data.pass2Params.values.gMatHDR:transposeSelf() -- with `directValuesExchange` we need to transpose matrices manually
+
+  data.pass2Params.values.gMatLDR:set(ac.getPostProcessingLDRColorMatrix())
+  data.pass2Params.values.gMatLDR:transposeSelf() 
 
   local ratioHalf = (rtSize.x / rtSize.y + 0.5) / 2
   data.pass2Params.values.gVignetteRatio:set(ratioHalf, 1 / ratioHalf)

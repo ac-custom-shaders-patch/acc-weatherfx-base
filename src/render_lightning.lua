@@ -6,6 +6,11 @@
   in a low-res buffer and applies gaussian blur to it.
 ]]
 
+if not ScriptSettings.EXTRA_EFFECTS.FOG_ABOVE then
+  AddVisualLightning = function (dir) end
+  return
+end
+
 local lightningPool
 
 ---@param dir vec3

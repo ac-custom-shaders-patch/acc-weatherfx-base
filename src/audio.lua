@@ -98,7 +98,6 @@ local function updateRainAudio(rainAmount, rainWetness, rainWater, dt)
     localOcclusion = ac.getCameraOcclusion(dirUp)
   end
 
-  -- local volume = ac.getAudioVolume(ac.AudioChannel.Rain)
   local volume = 1
   local wetTrack = localOcclusion * math.lerpInvSat(rainWetness, 0.002, 0.01)
   local wetVolume = wetTrack * volume

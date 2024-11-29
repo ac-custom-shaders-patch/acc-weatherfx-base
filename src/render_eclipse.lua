@@ -2,6 +2,11 @@
   A bit of a halo around the sun during full solar eclipse.
 ]]
 
+if not ScriptSettings.EXTRA_EFFECTS.ECLIPSE then
+  UpdateEclipseGlare = function (active) end
+  return
+end
+
 local function renderEclipseGlare()
   local sunDirVisual = ac.fixHeading(SunDir)
   render.setDepthMode(render.DepthMode.ReadOnly)
@@ -43,7 +48,7 @@ local subscribed ---@type fun()?
 
 function UpdateEclipseGlare(active)
   if not subscribed and active then
-    subscribed = RenderSkySubscribe(render.PassID.Main, renderEclipseGlare)
+    subscribed = RenderSkySubscribe(render.PassID.Main, renderEclipseGlare, 2)
   elseif subscribed and not active then
     subscribed()
     subscribed = nil

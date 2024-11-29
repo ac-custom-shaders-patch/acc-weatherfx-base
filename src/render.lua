@@ -57,12 +57,14 @@ end
 
 ---@param passIDMask render.PassID
 ---@param callback fun(passID: render.PassID, frameIndex: integer, uniqueKey: integer)
+---@param priority integer
 ---@return fun() @Call returned function to unsubscribe.
-function RenderSkySubscribe(passIDMask, callback)
+function RenderSkySubscribe(passIDMask, callback, priority)
   if passIDMask == 0 then return function () end end
-  local e = { passIDMask = passIDMask, callback = callback }
+  local e = { passIDMask = passIDMask, callback = callback, priority = priority or 0 }
   renderSkyListeners[#renderSkyListeners + 1] = e
   updateSkySubscription()
+  table.sort(renderSkyListeners, function (a, b) return a.priority > b.priority end)
   return function()
     table.removeItem(renderSkyListeners, e)
     updateSkySubscription()

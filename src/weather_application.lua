@@ -3,6 +3,9 @@
 -- cloud materials.
 --------
 
+CloudsLightDirection = vec3()
+CloudsLightColor = rgb()
+
 -- Various local variables, changing with each update, something easy to deal with things. There is 
 -- no need to edit any of those values if you want to change anything, please proceed further to
 -- actual functions setting that stuff
@@ -20,10 +23,6 @@ local lightDir = vec3(0, 1, 0)
 local lightColor = rgb(0, 0, 0)
 local fogRangeMult = 1
 local realNightK = 0
-
--- For smooth transition
-local sceneBrightnessValue = 1
-local sceneBrightnessDownDelay = 0
 
 -- Sky gradient covering everything, for sky-wide color correction
 local skyGeneralMult = nil
@@ -412,9 +411,11 @@ function ApplyLight()
   ac.setLightDirection(lightDir)
   ac.setLightColor(lightColor)
   ac.setSpecularColor(lightColor)
-  ac.setSunSpecularMultiplier(CurrentConditions.clear ^ 2)
+  ac.setSunSpecularMultiplier(0)
 
   ac.setCloudsLight(lightDir, lightColor, 6371e3)
+  CloudsLightDirection:set(lightDir)
+  CloudsLightColor:set(lightColor)
 end
 
 -- Updates ambient lighting based on sky color without taking sun or moon into account
@@ -544,7 +545,8 @@ function ApplyFog(dt)
 
   local ccFog = FinalFog
   if UseGammaFix then
-    ac.setFogColor(skyHorizonColor:scale(SkyBrightness * math.lerpInvSat(cameraOcclusion, 0.05, 1) * 0.5))
+    local occlusionMult = math.lerpInvSat(cameraOcclusion, 0.1, 1) ^ 2
+    ac.setFogColor(skyHorizonColor:scale(SkyBrightness * occlusionMult * 0.5))
 
     local pressureMult = 101325 / Sim.weatherConditions.pressure
     local fogBlend = math.lerpInvSat(ac.getAltitude(), 10e3, 5e3)
@@ -556,9 +558,10 @@ function ApplyFog(dt)
     local atmosphereFade = math.lerp(ccFog, 1, math.max(CurrentConditions.clouds, 1 - CurrentConditions.clear))
     ac.setFogAtmosphere(fogDistance * (1 - atmosphereFade * 0.5) / (22.5e3 * pressureMult) * (0.65 + Sim.weatherConditions.humidity * 0.7))
 
+    -- ac.debug('occlusionMult', occlusionMult)
     local distanceBoost = math.max(0, Sim.cameraPosition.y - GroundYAveraged) * math.lerp(4, 0.4, NightK)
     ac.setNearbyFog(secondaryFogColor:set(ambientDistantColor)
-        :addScaled(lightColor, lightDir.y):scale(1 - NightK):addScaled(skyHorizonColor, NightK):scale(2),
+        :addScaled(lightColor, lightDir.y):scale(1 - NightK):addScaled(skyHorizonColor, NightK):scale((0.05 + 0.95 * occlusionMult) * 2), --:mul(rgbm(1, 1, 0, 1)),
       math.lerp(math.lerp(5e3, 1e3, NightK), math.lerp(50, 30, NightK), ccFog) + distanceBoost, math.lerp(-20, -10, ccFog),
       fogBlend * math.min(1, 1.2 * ccFog / (0.1 + ccFog)),
       math.lerp(0.9, 1.1, fogNoise:get(Sim.cameraPosition)) * (1 + ccFog ^ 2))
@@ -645,8 +648,12 @@ function ApplySkyFeatures()
   ac.setSkyMoonMieExp(120)
   ac.setSkyMoonDepthSkip(true)
 
+  -- boosting stars brightness for low FOV for some extra movie magic
+  starsBrightness = starsBrightness / math.clampN(math.atan(math.rad(Sim.cameraFOV)), 0.05, 1)
+
   ac.setSkyStarsColor(MoonColor)
   ac.setSkyStarsBrightness(starsBrightness * moonOpacity)
+  StarsBrightness = starsBrightness * moonOpacity
 
   -- easiest way to take light pollution into account is
   -- to raise stars map in power: with stars map storing values from 0 to 1, it gets rid of dimmer stars only leaving
@@ -657,6 +664,9 @@ function ApplySkyFeatures()
     local pollutionK = LightPollutionValue
     pollutionK = math.lerp(pollutionK, 1, 1 - NightK)
     pollutionK = math.lerp(pollutionK, 1, math.lerpInvSat(MoonDir.y, -0.1, 0.1) * 0.5)
+
+    -- augustK = 1
+    -- pollutionK = 0
 
     ac.setSkyStarsSaturation(math.lerp(0.3, 0.1, pollutionK) * CurrentConditions.saturation)
     ac.setSkyStarsExponent(math.lerp(4 - augustK, 12, pollutionK))
@@ -720,22 +730,10 @@ end
 -- unlike auto-exposure approach, it would be smoother and wouldn’t jump as much if camera
 -- simply rotates and, for example, looks down in car interior
 ac.setCameraOcclusionDepthBoost(2.5)
-local dirUp = vec3(0, 1, 0)
 local function getSceneBrightness(dt)
-  local aoNow = ac.getCameraOcclusion(dirUp)
-  cameraOcclusion = aoNow
-
-  if aoNow < sceneBrightnessValue then
-    if sceneBrightnessDownDelay < 0 then
-      sceneBrightnessValue = math.max(aoNow, sceneBrightnessValue - dt * 2)
-    else
-      sceneBrightnessDownDelay = sceneBrightnessDownDelay - 10 * dt * (sceneBrightnessValue - aoNow)
-    end
-  else
-    sceneBrightnessValue = math.min(aoNow, sceneBrightnessValue + 4 * dt)
-    sceneBrightnessDownDelay = 1
-  end
-  return sceneBrightnessValue
+  local aoNow = ac.getCameraLookOcclusion()
+  cameraOcclusion = math.applyLag(cameraOcclusion, aoNow, RecentlyJumped > 0 and 0 or 0.98, dt)
+  return math.min(ac.sampleCameraAO(), 0.2 + 0.8 * cameraOcclusion)
 end
 
 local brightnessMult = 1
@@ -795,19 +793,26 @@ function ApplyFakeExposure(dt)
 
     lightBrightnessRaw = lightBrightnessRaw * aoK
     if SpaceLook > 0 then
-      lightBrightnessRaw = math.lerp(lightBrightnessRaw, 0.5, SpaceLook)
+      lightBrightnessRaw = math.lerp(lightBrightnessRaw, 10, SpaceLook)
     end
   
-    if initialSet > 0 then
+    if initialSet > 0 or RecentlyJumped > 0 then
       lightBrightness = lightBrightnessRaw
       initialSet = initialSet - 1
-    elseif lightBrightness < lightBrightnessRaw then
-      lightBrightness = math.min(lightBrightness + dt * AdaptationSpeed, lightBrightnessRaw)
-    elseif lightBrightness > lightBrightnessRaw then
-      lightBrightness = math.max(lightBrightness - dt * AdaptationSpeed, lightBrightnessRaw)
+    -- elseif lightBrightness < lightBrightnessRaw then
+    --   lightBrightness = math.min(lightBrightness + dt * AdaptationSpeed, lightBrightnessRaw)
+    -- elseif lightBrightness > lightBrightnessRaw then
+    --   lightBrightness = math.max(lightBrightness - dt * AdaptationSpeed, lightBrightnessRaw)
+    else
+      lightBrightness = math.applyLag(lightBrightness, lightBrightnessRaw, 0.98, dt)
     end
 
-    brightnessMult = 100 / math.lerp(lightBrightness, 15, 0.01)
+    -- brightnessMult = 100 / math.lerp(lightBrightness, 15, 0.01)
+    brightnessMult = 100 / math.max(0.2, lightBrightness)
+
+    -- ac.debug('lightBrightnessRaw', lightBrightnessRaw)
+    -- ac.debug('lightBrightness', lightBrightness)
+    -- ac.debug('brightnessMult', brightnessMult)
   else  
     ac.setHDRToLDRConversionHints(1, 1)
 

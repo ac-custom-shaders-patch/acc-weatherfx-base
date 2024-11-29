@@ -18,7 +18,16 @@ ScriptSettings = ac.INIConfig.scriptSettings():mapConfig({
   },
   POSTPROCESSING = {
     LIGHTWEIGHT_REPLACEMENT = false,
-    FILM_GRAIN = false
+    FILM_GRAIN = false,
+    GLARE_CHROMATIC_ABERRATION = false,
+  },
+  EXTRA_EFFECTS = {
+    UPPER_CLOUDS = true,
+    AURORAS = true,
+    FOG_ABOVE = true,
+    RAIN_HAZE = true,
+    LIGHTNING = true,
+    ECLIPSE = true,
   }
 })
 
@@ -35,7 +44,9 @@ CloudsMult = 0 -- turns to 0 at 4 km to hide clouds
 EclipseFullK = 0 -- starts growing when moon covers sun fully blocking the light, 1 at total eclipse, used for heavy darkening of sky and sun light
 ForceRapidUpdates = 0
 BrightnessMultApplied = 0
+StarsBrightness = 0
 GroundYAveraged = math.nan
+RecentlyJumped = 0
 Sim = ac.getSim()
 
 if Sim.isShowroomMode or Sim.isPreviewsGenerationMode then
@@ -133,11 +144,14 @@ require 'src/light_pollution'       -- adds a sky gradient for light pollution a
 require 'src/weather_clouds'        -- clouds operating in chunks
 require 'src/audio'                 -- audio
 require 'src/render'                -- render core
-require 'src/render_aurora'         -- extra effect: aurora
-require 'src/render_rain'           -- extra effect: rain haze
-require 'src/render_fog'            -- extra effect: fog covering tops of high buildings in foggy conditions
+
+require 'src/render_aurora'         -- auroras
+require 'src/render_rain'           -- rain haze
+require 'src/render_fog'            -- fog covering tops of high buildings in foggy conditions
 require 'src/render_eclipse'        -- glare around sun during eclipse
 require 'src/render_lightning'      -- simple bolt-like visual for lightnings
+require 'src/render_clouds'         -- upper clouds layer
+require 'src/render_meteor'         -- falling stars
 
 -- Use asyncronous textures loading for faster loading
 ac.setAsyncTextureLoading(true)
@@ -190,9 +204,12 @@ ac.fixSkyColorCalculateResult(true)
 ac.fixSkyColorCalculateOrder(true)
 ac.fixSkyV2Fog(true)
 ac.fixCloudsV2Fog(true)
+ac.useMinDepthResolution(true)
 
 -- A tweak for lambert diffuse model making lighting of regular materials more correct and PBR-like
 ac.setLambertGamma(UseLambertGammaFix and 1 / 2.2 or 1)
+
+CloudsDT = 0
 
 -- Called each 3rd frame or if sun moved
 local function rareUpdate1(dt)
@@ -211,11 +228,11 @@ local function rareUpdate2(dt)
   UpdateLightPollution()
   UpdateCloudMaterials()
   UpdateAurora(dt)
-  -- UpdateAboveFog(dt)
+  UpdateAboveFog(dt)
+  UpdateCloudLayers(dt)
 end
 
 local lastSunDir = vec3()
-local lastCameraPos = vec3()
 local currentSunDir = vec3()
 local lastGameTime = 0
 local ruBase = RareUpdate:new{ callback = rareUpdate1 }
@@ -230,32 +247,14 @@ local function getCloudsDeltaT(dt, gameDT)
   return dt * math.sign(cloudsDeltaTime) * math.lerp(1, ratio, 0.4)
 end
 
--- local function wfxGammaFixCompatibilityLayer(active)
---   if not _G._wfxclb then
---     _G._wfxclb = table.clone(ac, false)
---   end
---   if active then
---     ac.setLightColor = function (v) _G._wfxclb.setLightColor(v ^ 2.2) end
---     ac.setSpecularColor = function (v) _G._wfxclb.setSpecularColor(v ^ 2.2) end
---     ac.setAmbientColor = function (v) _G._wfxclb.setAmbientColor(v ^ 2.2) end
---     ac.setBaseAmbientColor = function (v) _G._wfxclb.setBaseAmbientColor(v ^ 2.2) end
---     ac.setDistantAmbientColor = function (v, a) _G._wfxclb.setDistantAmbientColor(v ^ 2.2, a) end
---     ac.setExtraAmbientColor = function (v) _G._wfxclb.setExtraAmbientColor(v ^ 2.2) end
---     ac.setFogExponent = function (v) _G._wfxclb.setFogExponent(v * 2.2) end
---     ac.setFogColor = function (v) _G._wfxclb.setFogColor(v ^ 2.2) end
---     ac.setSkyStarsExponent = function (v) _G._wfxclb.setSkyStarsExponent(v * 2.2) end
---   else
---     for k, v in pairs(_G._wfxclb) do
---       ac[k] = v
---     end
---   end
--- end
-
 local forceUpdateShadingNext = false
 local keepForceUpdates = 1
 
 function script.update(dt)
   local curGammaFix = Overrides.gamma ~= false
+  if Sim.currentVAOMode == ac.VAODebugMode.VAOOnly or Sim.currentVAOMode == ac.VAODebugMode.ShowNormals then
+    curGammaFix = false
+  end
   if UseGammaFix ~= curGammaFix then
     InitializeConsts(curGammaFix)
     OnGammaToggle()
@@ -265,24 +264,21 @@ function script.update(dt)
     end, 0.1)
   end
 
-  -- ac.debug('localVelocity', ac.getCar(0).localVelocity)
-  -- ac.debug('localAngularVelocity', ac.getCar(0).localAngularVelocity)
-  -- ac.debug('angularVelocity', ac.getCar(0).angularVelocity)
-  -- ac.debug('velocity', ac.getCar(0).velocity)
-  -- ac.debug('acceleration', ac.getCar(0).acceleration)
-
   -- This value is time passed in seconds (as dt), but taking into account pause, slow
   -- motion or fast forward, but not time scale in conditions
   local gameDT = Sim.dt
 
   -- Clouds operate on actual passed time
-  local cloudsDT = TimelapsyCloudSpeed and getCloudsDeltaT(dt, gameDT) or gameDT
+  CloudsDT = TimelapsyCloudSpeed and getCloudsDeltaT(dt, gameDT) or gameDT
 
   -- If sun moved too much, have to force update
   ac.getSunDirectionTo(currentSunDir)
-  local currentCameraPos = Sim.cameraPosition
-  local cameraOffset = math.squaredDistance(currentCameraPos, lastCameraPos)
-  if math.dot(lastSunDir, currentSunDir) < 0.999995 or cameraOffset > 10 then
+  if Sim.cameraJumped then
+    RecentlyJumped = 5
+  elseif RecentlyJumped > 0 then
+    RecentlyJumped = RecentlyJumped - 1
+  end
+  if math.dot(lastSunDir, currentSunDir) < 0.999995 or Sim.cameraJumped then
     keepForceUpdates = 1
   end
   local forceUpdate = ForceRapidUpdates > 0
@@ -295,10 +291,8 @@ function script.update(dt)
     ForceRapidUpdates = ForceRapidUpdates + 1
   end
 
-  lastCameraPos:set(currentCameraPos)
-
   local groundY = ac.getGroundYApproximation()
-  if math.isnan(GroundYAveraged) or cameraOffset > 50 * 50 then
+  if math.isnan(GroundYAveraged) or Sim.cameraJumped then
     GroundYAveraged = groundY
   else
     GroundYAveraged = math.applyLag(GroundYAveraged, groundY, 0.995, dt)
@@ -317,22 +311,22 @@ function script.update(dt)
 
   -- Actual update will happen only once in three frames, or if forceUpdate is true
   ruBase:update(gameDT, forceUpdateShading)
-  ruCloudMaterials:update(cloudsDT, forceUpdateShading)
+  ruCloudMaterials:update(CloudsDT, forceUpdateShading)
 
   -- Increasing refresh rate for faster moving clouds
-  if math.abs(cloudsDT) > 0.5 then 
+  if math.abs(CloudsDT) > 0.5 then 
     ruClouds.skip = 0 
     ac.invalidateCloudReflections()
-  elseif math.abs(cloudsDT) > 0.05 then 
+  elseif math.abs(CloudsDT) > 0.05 then 
     ruClouds.skip = 1
     if Sim.frame % 4 == 0 then      
       ac.invalidateCloudReflections()
     end
-  elseif math.abs(cloudsDT) < 0.03 then 
+  elseif math.abs(CloudsDT) < 0.03 then 
     ruClouds.skip = 2
   end
 
-  ruClouds:update(cloudsDT, forceUpdate)
+  ruClouds:update(CloudsDT, forceUpdate)
 
   -- Fake exposure aka eye adaptation needs to update each frame, with speed independant 
   -- from pause, slow motion and what not
@@ -346,6 +340,15 @@ function script.update(dt)
 
   -- Uncomment to check how much garbage is generated each frame (slows things down)
   -- RunGC()
+
+  if CurrentConditions.windDir.x == 0 and CurrentConditions.windDir.y == 0 then
+    CurrentConditions.windDir:set(CurrentConditions.windDirInstant)
+    CurrentConditions.windSpeed = CurrentConditions.windSpeedInstant
+  else
+    local mix = math.lagMult(0.995, dt)
+    CurrentConditions.windDir:scale(1 - mix):addScaled(CurrentConditions.windDirInstant, mix)
+    CurrentConditions.windSpeed = math.lerp(CurrentConditions.windSpeed, CurrentConditions.windSpeedInstant, mix)
+  end
 end
 
 if ScriptSettings.POSTPROCESSING.LIGHTWEIGHT_REPLACEMENT then

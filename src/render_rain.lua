@@ -22,6 +22,11 @@
   of complications with various transparent objects.
 ]]
 
+if not ScriptSettings.EXTRA_EFFECTS.RAIN_HAZE then
+  UpdateRainHaze = function (dt) end
+  return
+end
+
 local intensity = 0
 local windOffset = vec3()
 local windVelocity = vec3()

@@ -100,7 +100,7 @@ local cloudNoise = LowFrequency2DNoise:new{ frequency = 0.001 }
 function CloudsCell:initialize()
   self.initialized = true
   local DynamicClouds = 8
-  local HoveringClouds = 2
+  local HoveringClouds = UseGammaFix and 0 or 2
   for i = 1, DynamicClouds + HoveringClouds do
     local hovering = i > DynamicClouds
     local pos = self:getPos(hovering)
